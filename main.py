@@ -515,12 +515,14 @@ def export_project(project_name):
         as_attachment=True
     )
 
-if __name__ == '__main__':
+#if __name__ == '__main__':
     # Crea le tabelle del database se non esistono già.
     # Questo va eseguito una sola volta all'avvio dell'applicazione.
-    with app.app_context():
-        db.create_all()
-        print("Database inizializzato e tabelle create (se non esistenti).")
+#    with app.app_context():
+#        db.create_all()
+#        print("Database inizializzato e tabelle create (se non esistenti).")
 
     # Avvia il server di sviluppo di Flask
-    app.run(debug=True)
+#    app.run(debug=True)
+
+application = app
