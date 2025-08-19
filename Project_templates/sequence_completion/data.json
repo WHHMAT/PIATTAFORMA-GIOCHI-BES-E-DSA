@@ -1,0 +1,45 @@
+[
+    {
+      "instruction": "Completa la sequenza numerica:",
+      "sequence": ["1", "3", "5"],
+      "options": ["6", "7", "8"],
+      "answer": "7"
+    },
+    {
+      "instruction": "Quale numero viene dopo?",
+      "sequence": ["20", "18", "16"],
+      "options": ["14", "15", "17"],
+      "answer": "14"
+    },
+    {
+      "instruction": "Completa la sequenza di giorni della settimana:",
+      "sequence": ["Lunedì", "Martedì", "Mercoledì"],
+      "options": ["Venerdì", "Giovedì", "Sabato"],
+      "answer": "Giovedì"
+    },
+    {
+      "instruction": "Quale figura geometrica viene dopo?",
+      "sequence": ["Triangolo", "Cerchio", "Quadrato", "Triangolo"],
+      "options": ["Quadrato", "Cerchio", "Rettangolo"],
+      "answer": "Cerchio"
+    },
+    {
+      "instruction": "Completa la sequenza numerica:",
+      "sequence": ["5", "10", "15"],
+      "options": ["16", "20", "25"],
+      "answer": "20"
+    },
+    {
+      "instruction": "Quale animale viene dopo?",
+      "sequence": ["Gatto", "Cane", "Gatto"],
+      "options": ["Pesce", "Gatto", "Cane"],
+      "answer": "Cane"
+    },
+    {
+      "instruction": "Completa la sequenza delle stagioni:",
+      "sequence": ["Primavera", "Estate", "Autunno"],
+      "options": ["Autunno", "Inverno", "Vento"],
+      "answer": "Inverno"
+    }
+]
+  

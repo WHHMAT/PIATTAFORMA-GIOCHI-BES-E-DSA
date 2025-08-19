@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Editor Visuale: {{ project_name }}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <style>
+        body > main { padding: 1rem; }
+        .container { max-width: 960px; margin: auto; }
+        nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        
+        .level-card {
+            background-color: var(--card-background-color);
+            border: 1px solid var(--card-border-color);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .level-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--muted-border-color);
+            padding-bottom: 1rem;
+        }
+        .pair-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto; /* Colonna A, Colonna B, Pulsante Rimuovi */
+            gap: 1rem;
+            align-items: start; /* Allinea gli elementi all'inizio */
+            margin-bottom: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--muted-border-color);
+        }
+        .pair-item-editor { display: flex; flex-direction: column; gap: 0.5rem; }
+        .pair-item-editor label { font-weight: bold; font-size: 0.9em; margin-bottom: 0; }
+        .pair-row input { margin-bottom: 0; }
+        .remove-btn { background-color: var(--secondary); border-color: var(--secondary); color: var(--secondary-inverse); padding: 0.5rem 0.75rem; }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <nav>
+            <div>
+                <a href="{{ url_for('dashboard') }}">← Dashboard</a>
+                <a href="{{ url_for('edit_project', project_name=project_name) }}" style="margin-left: 1rem;">Editor Codice</a>
+            </div>
+            <button id="save-all-btn">Salva Tutte le Modifiche</button>
+        </nav>
+
+        <h1>Editor Visuale per <em>{{ project_name }}</em></h1>
+        <p>Modifica i livelli e le coppie di parole per il gioco di abbinamento.</p>
+
+        <div id="levels-container">
+            <!-- I livelli verranno generati qui da JavaScript -->
+        </div>
+
+        <button id="add-level-btn" class="outline">Aggiungi Nuovo Livello</button>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const levelsContainer = document.getElementById('levels-container');
+            const addLevelBtn = document.getElementById('add-level-btn');
+            const saveAllBtn = document.getElementById('save-all-btn');
+            const projectName = '{{ project_name }}';
+            
+            let gameData = JSON.parse('{{ game_data | tojson | safe }}');
+            let nextId = 1;
+
+            function initializeNextId() {
+                let maxId = 0;
+                if (gameData && Array.isArray(gameData)) {
+                    gameData.forEach(level => {
+                        if (level.pairs && Array.isArray(level.pairs)) {
+                            level.pairs.forEach(pair => {
+                                if (pair.id && typeof pair.id === 'number' && pair.id > maxId) {
+                                    maxId = pair.id;
+                                }
+                            });
+                        }
+                    });
+                }
+                nextId = maxId + 1;
+            }
+
+            function renderAllLevels() {
+                levelsContainer.innerHTML = '';
+                if (!gameData || !Array.isArray(gameData)) {
+                    gameData = [];
+                }
+                gameData.forEach((level, levelIndex) => {
+                    levelsContainer.appendChild(createLevelElement(level, levelIndex));
+                });
+            }
+
+            function createLevelElement(level, levelIndex) {
+                const levelCard = document.createElement('article');
+                levelCard.className = 'level-card';
+                levelCard.dataset.levelIndex = levelIndex;
+
+                levelCard.innerHTML = `
+                    <div class="level-header">
+                        <label for="instruction-${levelIndex}">
+                            <strong>Livello ${levelIndex + 1}: Istruzione</strong>
+                        </label>
+                        <button class="remove-btn remove-level-btn">Rimuovi Livello</button>
+                    </div>
+                    <input type="text" id="instruction-${levelIndex}" class="level-instruction" value="${level.instruction || ''}" placeholder="Es: Abbina la parola all'immagine">
+                    
+                    <div class="pairs-container" style="margin-top: 1.5rem;"></div>
+                    <button class="outline add-pair-btn">Aggiungi Coppia</button>
+                `;
+
+                const pairsContainer = levelCard.querySelector('.pairs-container');
+                if (level.pairs && Array.isArray(level.pairs)) {
+                    level.pairs.forEach((pair, pairIndex) => {
+                        pairsContainer.appendChild(createPairElement(pair));
+                    });
+                }
+                return levelCard;
+            }
+
+            function createPairElement(pair) {
+                const pairRow = document.createElement('div');
+                pairRow.className = 'pair-row';
+
+                pairRow.innerHTML = `
+                    <div class="pair-item-editor">
+                        <label>Elemento A</label>
+                        <input type="text" class="pair-itemA-text" value="${pair.itemA.text || ''}" placeholder="Testo (es: Gatto)">
+                        <input type="text" class="pair-itemA-image" value="${pair.itemA.image || ''}" placeholder="URL Immagine (opzionale)">
+                    </div>
+                    <div class="pair-item-editor">
+                        <label>Elemento B</label>
+                        <input type="text" class="pair-itemB-text" value="${pair.itemB.text || ''}" placeholder="Testo (es: Cat)">
+                        <input type="text" class="pair-itemB-image" value="${pair.itemB.image || ''}" placeholder="URL Immagine (opzionale)">
+                    </div>
+                    <button class="remove-btn remove-pair-btn" style="margin-top: 2.4rem;">X</button>
+                `;
+                return pairRow;
+            }
+
+            // Funzione chiave per leggere lo stato corrente dal DOM e aggiornare l'oggetto gameData.
+            // Previene la perdita di dati quando si eseguono operazioni che rigenerano l'interfaccia.
+            function syncGameDataFromDOM() {
+                const levelCards = document.querySelectorAll('.level-card');
+                const newGameData = [];
+                levelCards.forEach((card, levelIndex) => {
+                    const instruction = card.querySelector('.level-instruction').value;
+                    const pairs = [];
+                    card.querySelectorAll('.pair-row').forEach((row, pairIndex) => {
+                        const itemA_text = row.querySelector('.pair-itemA-text').value.trim();
+                        const itemA_image = row.querySelector('.pair-itemA-image').value.trim();
+                        const itemB_text = row.querySelector('.pair-itemB-text').value.trim();
+                        const itemB_image = row.querySelector('.pair-itemB-image').value.trim();
+
+                        if (!itemA_text && !itemA_image && !itemB_text && !itemB_image) {
+                            return; // Salta le coppie completamente vuote
+                        }
+
+                        // Mantiene l'ID originale per garantire la coerenza
+                        const originalPair = gameData[levelIndex]?.pairs[pairIndex];
+                        const id = originalPair?.id || nextId++;
+
+                        const itemA = { text: itemA_text, image: itemA_image };
+                        const itemB = { text: itemB_text, image: itemB_image };
+
+                        pairs.push({ id, itemA, itemB });
+                    });
+                    newGameData.push({ instruction, pairs });
+                });
+                gameData = newGameData;
+            }
+
+            function addLevel() {
+                syncGameDataFromDOM(); // Sincronizza prima di modificare la struttura
+                gameData.push({
+                    instruction: "Nuova istruzione",
+                    pairs: [{ id: nextId++, itemA: { text: "", image: "" }, itemB: { text: "", image: "" } }]
+                });
+                renderAllLevels();
+            }
+
+            function addPair(levelIndex) {
+                syncGameDataFromDOM(); // Sincronizza prima di modificare la struttura
+                if (!gameData[levelIndex].pairs) gameData[levelIndex].pairs = [];
+                gameData[levelIndex].pairs.push({ id: nextId++, itemA: { text: "", image: "" }, itemB: { text: "", image: "" } });
+                renderAllLevels();
+            }
+
+            function removeLevel(levelIndex) {
+                if (confirm(`Sei sicuro di voler rimuovere il Livello ${levelIndex + 1}?`)) {
+                    syncGameDataFromDOM(); // Sincronizza prima di modificare la struttura
+                    gameData.splice(levelIndex, 1);
+                    renderAllLevels();
+                }
+            }
+
+            function removePair(levelIndex, pairIndex) {
+                syncGameDataFromDOM(); // Sincronizza prima di modificare la struttura
+                if (gameData[levelIndex] && gameData[levelIndex].pairs) {
+                    gameData[levelIndex].pairs.splice(pairIndex, 1);
+                    renderAllLevels();
+                }
+            }
+
+            async function saveAllChanges() {
+                // 1. Sincronizza lo stato finale dal DOM all'oggetto gameData
+                syncGameDataFromDOM();
+
+                // 2. Invia i dati aggiornati al backend
+                saveAllBtn.disabled = true;
+                saveAllBtn.textContent = 'Salvataggio...';
+                try {
+                    const response = await fetch(`/api/project/${projectName}/visual_data`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(gameData)
+                    });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.error || 'Errore sconosciuto');
+                    alert(result.message);
+                    initializeNextId(); // Ricalcola il prossimo ID dopo un salvataggio riuscito
+                    renderAllLevels(); 
+                } catch (error) {
+                    alert(`Errore durante il salvataggio: ${error.message}`);
+                } finally {
+                    saveAllBtn.disabled = false;
+                    saveAllBtn.textContent = 'Salva Tutte le Modifiche';
+                };
+            }
+
+            // Event Delegation per gestire i click sui pulsanti dinamici
+            levelsContainer.addEventListener('click', (e) => {
+                const levelCard = e.target.closest('.level-card');
+                if (!levelCard) return;
+                const levelIndex = parseInt(levelCard.dataset.levelIndex, 10);
+
+                if (e.target.classList.contains('remove-level-btn')) {
+                    removeLevel(levelIndex);
+                } else if (e.target.classList.contains('add-pair-btn')) {
+                    addPair(levelIndex);
+                } else if (e.target.classList.contains('remove-pair-btn')) {
+                    const pairRow = e.target.closest('.pair-row');
+                    const pairIndex = Array.from(pairRow.parentNode.children).indexOf(pairRow);
+                    removePair(levelIndex, pairIndex);
+                }
+            });
+
+            addLevelBtn.addEventListener('click', addLevel);
+            saveAllBtn.addEventListener('click', saveAllChanges);
+
+            // Render iniziale
+            initializeNextId();
+            renderAllLevels();
+        });
+
+    </script> 
+</html>

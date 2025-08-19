@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Editor Visuale Quiz: {{ project_name }}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <style>
+        body > main { padding: 1rem; }
+        .container { max-width: 960px; margin: auto; }
+        nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        .question-card {
+            background-color: var(--card-background-color);
+            border: 1px solid var(--card-border-color);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .question-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--muted-border-color);
+            padding-bottom: 1rem;
+        }
+        .option-row {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .option-row input[type="radio"] { width: auto; margin: 0; }
+        .remove-btn {
+            background-color: var(--secondary);
+            border-color: var(--secondary);
+            color: var(--secondary-inverse);
+            padding: 0.5rem 0.75rem;
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <nav>
+            <div>
+                <a href="{{ url_for('dashboard') }}">← Dashboard</a>
+                <a href="{{ url_for('edit_project', project_name=project_name) }}" style="margin-left: 1rem;">Editor Codice</a>
+            </div>
+            <button id="save-all-btn">Salva Tutte le Modifiche</button>
+        </nav>
+
+        <h1>Editor Visuale per <em>{{ project_name }}</em></h1>
+        <p>Gestisci le domande del quiz. Per ogni domanda, aggiungi le opzioni e seleziona la risposta corretta.</p>
+
+        <div id="questions-container"></div>
+
+        <button id="add-question-btn" class="outline">Aggiungi Nuova Domanda</button>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const questionsContainer = document.getElementById('questions-container');
+            const addQuestionBtn = document.getElementById('add-question-btn');
+            const saveAllBtn = document.getElementById('save-all-btn');
+            const projectName = '{{ project_name }}';
+
+            let gameData = JSON.parse('{{ game_data | tojson | safe }}');
+
+            function initializeState() {
+                if (!Array.isArray(gameData) || gameData.length === 0) {
+                    gameData = [{
+                        question_text: "Qual è la capitale d'Italia?",
+                        image: "",
+                        options: ["Roma", "Parigi", "Madrid"],
+                        correct_answer: "Roma"
+                    }];
+                }
+            }
+
+            function render() {
+                questionsContainer.innerHTML = '';
+                gameData.forEach((question, index) => {
+                    questionsContainer.appendChild(createQuestionElement(question, index));
+                });
+            }
+
+            function createQuestionElement(question, questionIndex) {
+                const card = document.createElement('article');
+                card.className = 'question-card';
+                card.dataset.index = questionIndex;
+
+                const optionsHTML = (question.options || []).map((option, optionIndex) => {
+                    const isCorrect = option === question.correct_answer;
+                    return `
+                        <div class="option-row">
+                            <input type="radio" name="correct-answer-${questionIndex}" value="${option}" ${isCorrect ? 'checked' : ''} title="Seleziona come risposta corretta">
+                            <input type="text" class="option-text" value="${option || ''}" placeholder="Testo opzione">
+                            <button class="remove-btn remove-option-btn">X</button>
+                        </div>
+                    `;
+                }).join('');
+
+                card.innerHTML = `
+                    <div class="question-header">
+                        <strong>Domanda ${questionIndex + 1}</strong>
+                        <button class="remove-btn remove-question-btn">Rimuovi Domanda</button>
+                    </div>
+                    <label>Testo della domanda</label>
+                    <textarea class="question-text" placeholder="Scrivi qui la domanda...">${question.question_text || ''}</textarea>
+                    <label style="margin-top: 1rem;">Immagine (opzionale)</label>
+                    <input type="text" class="question-image" value="${question.image || ''}" placeholder="URL immagine">
+                    <div class="options-container" style="margin-top: 1.5rem;">
+                        <label>Opzioni di risposta</label>
+                        ${optionsHTML}
+                    </div>
+                    <button class="outline add-option-btn" style="margin-top: 1rem;">Aggiungi Opzione</button>
+                `;
+                return card;
+            }
+
+            function syncGameDataFromDOM() {
+                const newGameData = [];
+                document.querySelectorAll('.question-card').forEach(card => {
+                    const question_text = card.querySelector('.question-text').value.trim();
+                    const image = card.querySelector('.question-image').value.trim();
+                    const options = [];
+                    let correct_answer = '';
+
+                    card.querySelectorAll('.option-row').forEach(row => {
+                        const optionText = row.querySelector('.option-text').value.trim();
+                        if (optionText) {
+                            options.push(optionText);
+                            if (row.querySelector('input[type="radio"]').checked) {
+                                correct_answer = optionText;
+                            }
+                        }
+                    });
+
+                    if (question_text && options.length > 0) {
+                        if (!correct_answer && options.length > 0) correct_answer = options[0];
+                        newGameData.push({ question_text, image, options, correct_answer });
+                    }
+                });
+                gameData = newGameData;
+            }
+
+            document.body.addEventListener('click', (e) => {
+                syncGameDataFromDOM();
+                const questionCard = e.target.closest('.question-card');
+                if (e.target.id === 'add-question-btn') {
+                    gameData.push({ question_text: "Nuova domanda", image: "", options: ["Nuova opzione"], correct_answer: "Nuova opzione" });
+                } else if (questionCard) {
+                    const questionIndex = parseInt(questionCard.dataset.index, 10);
+                    if (e.target.classList.contains('remove-question-btn')) {
+                        if (confirm('Sei sicuro di voler rimuovere questa domanda?')) gameData.splice(questionIndex, 1);
+                    } else if (e.target.classList.contains('add-option-btn')) {
+                        gameData[questionIndex].options.push("Altra opzione");
+                    } else if (e.target.classList.contains('remove-option-btn')) {
+                        const optionRow = e.target.closest('.option-row');
+                        const allOptionRows = Array.from(optionRow.parentElement.querySelectorAll('.option-row'));
+                        const optionIndex = allOptionRows.indexOf(optionRow);
+                        if (optionIndex > -1) {
+                            gameData[questionIndex].options.splice(optionIndex, 1);
+                        }
+                    }
+                }
+                render();
+            });
+
+            async function saveAllChanges() {
+                syncGameDataFromDOM();
+                saveAllBtn.disabled = true;
+                saveAllBtn.textContent = 'Salvataggio...';
+                try {
+                    const response = await fetch(`/api/project/${projectName}/visual_data`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(gameData)
+                    });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.error || 'Errore sconosciuto');
+                    alert(result.message);
+                    initializeState();
+                    render();
+                } catch (error) {
+                    alert(`Errore durante il salvataggio: ${error.message}`);
+                } finally {
+                    saveAllBtn.disabled = false;
+                    saveAllBtn.textContent = 'Salva Tutte le Modifiche';
+                }
+            }
+
+            saveAllBtn.addEventListener('click', saveAllChanges);
+
+            initializeState();
+            render();
+        });
+    </script>
+</body>
+</html>

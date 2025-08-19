@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Editor Visuale Sequenze: {{ project_name }}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <style>
+        body > main { padding: 1rem; }
+        .container { max-width: 960px; margin: auto; }
+        nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        
+        .level-card {
+            background-color: var(--card-background-color);
+            border: 1px solid var(--card-border-color);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .level-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--muted-border-color);
+            padding-bottom: 1rem;
+        }
+        .remove-btn {
+            background-color: var(--secondary);
+            border-color: var(--secondary);
+            color: var(--secondary-inverse);
+            padding: 0.5rem 0.75rem;
+        }
+        small { color: var(--muted-color); }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <nav>
+            <div>
+                <a href="{{ url_for('dashboard') }}">← Dashboard</a>
+                <a href="{{ url_for('edit_project', project_name=project_name) }}" style="margin-left: 1rem;">Editor Codice</a>
+            </div>
+            <button id="save-all-btn">Salva Tutte le Modifiche</button>
+        </nav>
+
+        <h1>Editor Visuale per <em>{{ project_name }}</em></h1>
+        <p>Gestisci i livelli del gioco di completamento di sequenze.</p>
+
+        <div id="levels-container">
+            <!-- I livelli verranno generati qui da JavaScript -->
+        </div>
+
+        <button id="add-level-btn" class="outline">Aggiungi Nuovo Livello</button>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const levelsContainer = document.getElementById('levels-container');
+            const addLevelBtn = document.getElementById('add-level-btn');
+            const saveAllBtn = document.getElementById('save-all-btn');
+            const projectName = '{{ project_name }}';
+
+            let gameData = JSON.parse('{{ game_data | tojson | safe }}');
+
+            function render() {
+                levelsContainer.innerHTML = '';
+                if (!gameData || !Array.isArray(gameData)) gameData = [];
+                gameData.forEach((level, index) => {
+                    levelsContainer.appendChild(createLevelElement(level, index));
+                });
+            }
+
+            function createLevelElement(level, index) {
+                const card = document.createElement('article');
+                card.className = 'level-card';
+                card.dataset.index = index;
+
+                const fullSequence = [...(level.sequence || []), level.answer || ''].join(', ');
+                const distractors = (level.options || []).filter(opt => opt !== level.answer).join(', ');
+
+                card.innerHTML = `
+                    <div class="level-header">
+                        <strong>Livello ${index + 1}</strong>
+                        <button class="remove-btn remove-level-btn">Rimuovi Livello</button>
+                    </div>
+                    <label for="instruction-${index}">Istruzione</label>
+                    <input type="text" id="instruction-${index}" class="level-instruction" value="${level.instruction || ''}" placeholder="Completa la sequenza">
+                    
+                    <label for="sequence-${index}" style="margin-top: 1rem;">Sequenza Completa</label>
+                    <input type="text" id="sequence-${index}" class="level-sequence" value="${fullSequence}" placeholder="Es: 2, 4, 6, 8">
+                    <small>Inserisci gli elementi separati da virgola. L'ultimo elemento sarà la risposta corretta.</small>
+
+                    <label for="options-${index}" style="margin-top: 1rem;">Opzioni Sbagliate (distrattori)</label>
+                    <input type="text" id="options-${index}" class="level-options" value="${distractors}" placeholder="Es: 7, 9, 5">
+                    <small>Inserisci le opzioni errate separate da virgola. La risposta corretta verrà aggiunta automaticamente.</small>
+                `;
+                return card;
+            }
+
+            function syncGameDataFromDOM() {
+                const levelCards = document.querySelectorAll('.level-card');
+                const newGameData = [];
+                levelCards.forEach(card => {
+                    const instruction = card.querySelector('.level-instruction').value.trim();
+                    const fullSequenceStr = card.querySelector('.level-sequence').value.trim();
+                    const optionsStr = card.querySelector('.level-options').value.trim();
+
+                    if (!instruction || !fullSequenceStr) return;
+
+                    const sequenceParts = fullSequenceStr.split(',').map(s => s.trim()).filter(Boolean);
+                    if (sequenceParts.length < 2) return; // Serve almeno un elemento e una risposta
+
+                    const answer = sequenceParts.pop();
+                    const sequence = sequenceParts;
+                    
+                    const distractors = optionsStr ? optionsStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+                    const options = [...new Set([answer, ...distractors])].sort(() => Math.random() - 0.5);
+
+                    newGameData.push({ instruction, sequence, answer, options });
+                });
+                gameData = newGameData;
+            }
+
+            addLevelBtn.addEventListener('click', () => {
+                syncGameDataFromDOM();
+                gameData.push({
+                    instruction: "Nuovo livello",
+                    sequence: ["A", "B"],
+                    answer: "C",
+                    options: ["X", "Y", "C"]
+                });
+                render();
+            });
+
+            document.body.addEventListener('click', (e) => {
+                if (e.target.classList.contains('remove-level-btn')) {
+                    if (confirm('Sei sicuro di voler rimuovere questo livello?')) {
+                        syncGameDataFromDOM();
+                        const index = parseInt(e.target.closest('.level-card').dataset.index, 10);
+                        gameData.splice(index, 1);
+                        render();
+                    }
+                }
+            });
+
+            async function saveAllChanges() {
+                syncGameDataFromDOM();
+                saveAllBtn.disabled = true;
+                saveAllBtn.textContent = 'Salvataggio...';
+                try {
+                    const response = await fetch(`/api/project/${projectName}/visual_data`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(gameData)
+                    });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.error || 'Errore sconosciuto');
+                    alert(result.message);
+                    render();
+                } catch (error) {
+                    alert(`Errore durante il salvataggio: ${error.message}`);
+                } finally {
+                    saveAllBtn.disabled = false;
+                    saveAllBtn.textContent = 'Salva Tutte le Modifiche';
+                }
+            }
+
+            saveAllBtn.addEventListener('click', saveAllChanges);
+
+            render();
+        });
+    </script>
+</body>
+</html>

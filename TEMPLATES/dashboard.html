@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Toastify CSS -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Dashboard</h1>
+
+        <div>
+        <a href="{{ url_for('create_project') }}" class="button">Crea Nuovo Progetto</a>
+        <a href="{{ url_for('reports') }}" class="button">Visualizza Report</a>
+        </div>    
+        <h2>I Miei Progetti</h2>
+        {% if projects %}
+            <ul class="project-list">
+            {% for project in projects %}
+                <li class="project-item" id="project-{{ project.id }}">
+                    <span class="project-name">{{ project.name }}</span>
+                    <div class="project-actions">
+                        <a href="{{ url_for('edit_project', project_name=project.id) }}" class="action-icon edit-icon" title="Modifica">✏️</a>
+                        <a href="{{ url_for('preview_project_redirect', project_name=project.id) }}" class="action-icon preview-icon" title="Anteprima Rapida" target="_blank">▶️</a>
+                        <a href="{{ url_for('launch_game', project_name=project.id) }}" class="action-icon launch-icon" title="Avvia con Tracking" target="_blank">🚀</a>
+                        <a href="{{ url_for('export_project', project_name=project.id) }}" class="action-icon export-icon" title="Esporta">📥</a>
+                        <button class="action-icon duplicate-icon" data-project-id="{{ project.id }}" data-project-name="{{ project.name }}" title="Duplica">📋</button>
+                        <form class="delete-form" action="{{ url_for('delete_project', project_name=project.id) }}" method="post">
+                            <button type="submit" class="action-icon delete-icon" title="Elimina">
+                                🗑️
+                            </button>
+                        </form>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>Non hai ancora nessun progetto. Creane uno per iniziare!</p>
+        {% endif %}
+    </div>
+
+    <!-- Toastify JS -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <script>
+        // Funzione helper per mostrare le notifiche toast
+        function showToast(message, type = 'success') {
+            Toastify({
+                text: message,
+                duration: 3500,
+                close: true,
+                gravity: "top",
+                position: "right",
+                backgroundColor: type === 'success' ? "linear-gradient(to right, #00b09b, #96c93d)" : "linear-gradient(to right, #ff5f6d, #ffc371)",
+                stopOnFocus: true,
+            }).showToast();
+        }
+
+        // Gestione asincrona dell'eliminazione dei progetti
+        document.querySelectorAll('.delete-form').forEach(form => {
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault(); // Impedisce il ricaricamento della pagina
+
+                if (confirm('Sei sicuro di voler eliminare questo progetto? L\'azione è irreversibile.')) {
+                    try {
+                        const response = await fetch(form.action, {
+                            method: 'POST'
+                        });
+                        const result = await response.json();
+
+                        showToast(result.message, result.status);
+
+                        if (response.ok) {
+                            // Rimuove l'elemento del progetto dalla lista senza ricaricare la pagina
+                            const projectId = form.action.split('/').pop();
+                            document.getElementById(`project-${projectId}`).remove();
+                        }
+                    } catch (error) {
+                        showToast('Errore di connessione con il server.', 'error');
+                    }
+                }
+            });
+        });
+
+        // Gestione asincrona della duplicazione dei progetti
+        document.querySelectorAll('.duplicate-icon').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const projectId = e.target.dataset.projectId;
+                const projectName = e.target.dataset.projectName;
+
+                if (confirm(`Sei sicuro di voler duplicare il progetto "${projectName}"?`)) {
+                    try {
+                        const response = await fetch(`/duplicate_project/${projectId}`, {
+                            method: 'POST'
+                        });
+                        const result = await response.json();
+
+                        showToast(result.message, result.status);
+
+                        if (response.ok) {
+                            // Ricarica la pagina per mostrare il nuovo progetto
+                            setTimeout(() => { window.location.reload(); }, 1500);
+                        }
+                    } catch (error) {
+                        showToast('Errore di connessione con il server.', 'error');
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>

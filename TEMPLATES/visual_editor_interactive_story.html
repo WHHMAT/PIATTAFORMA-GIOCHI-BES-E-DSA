@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Editor Visuale Storia: {{ project_name }}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <style>
+        body > main { padding: 1rem; }
+        .container { max-width: 960px; margin: auto; }
+        nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        
+        .scene-card {
+            background-color: var(--card-background-color);
+            border: 1px solid var(--card-border-color);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .scene-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .choice-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 1rem;
+            align-items: center;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--muted-border-color);
+        }
+        .remove-btn {
+            background-color: var(--secondary);
+            border-color: var(--secondary);
+            color: var(--secondary-inverse);
+            padding: 0.5rem 0.75rem;
+        }
+        .global-settings { margin-bottom: 2rem; }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <nav>
+            <div>
+                <a href="{{ url_for('dashboard') }}">← Dashboard</a>
+                <a href="{{ url_for('edit_project', project_name=project_name) }}" style="margin-left: 1rem;">Editor Codice</a>
+            </div>
+            <button id="save-all-btn">Salva Tutte le Modifiche</button>
+        </nav>
+
+        <h1>Editor Visuale per <em>{{ project_name }}</em></h1>
+        <p>Crea le scene e collega le scelte per costruire la tua storia interattiva.</p>
+
+        <article class="global-settings">
+            <label for="start-node-select"><strong>Scena Iniziale</strong></label>
+            <select id="start-node-select"></select>
+        </article>
+
+        <div id="scenes-container"></div>
+
+        <button id="add-scene-btn" class="outline">Aggiungi Nuova Scena</button>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const scenesContainer = document.getElementById('scenes-container');
+            const addSceneBtn = document.getElementById('add-scene-btn');
+            const saveAllBtn = document.getElementById('save-all-btn');
+            const startNodeSelect = document.getElementById('start-node-select');
+            const projectName = '{{ project_name }}';
+
+            let storyData = JSON.parse('{{ game_data | tojson | safe }}');
+
+            function initializeState() {
+                // Se i dati non sono un oggetto valido o sono un array vuoto (da un nuovo progetto),
+                // crea una struttura di base per iniziare.
+                if (!storyData || typeof storyData.nodes !== 'object' || Array.isArray(storyData)) {
+                    storyData = { 
+                        start_node: 'start', 
+                        nodes: { 
+                            'start': { 
+                                text: 'Questa è la prima scena. Modificala!', 
+                                choices: [] 
+                            } 
+                        } 
+                    };
+                }
+                // Assicura che ci sia sempre un nodo di partenza valido se esistono nodi.
+                if (!storyData.start_node && Object.keys(storyData.nodes).length > 0) {
+                    storyData.start_node = Object.keys(storyData.nodes)[0];
+                }
+            }
+
+            function render() {
+                scenesContainer.innerHTML = '';
+                
+                const sceneIds = Object.keys(storyData.nodes);
+
+                // Popola il selettore della scena iniziale
+                startNodeSelect.innerHTML = sceneIds.map(id => 
+                    `<option value="${id}" ${storyData.start_node === id ? 'selected' : ''}>${id}</option>`
+                ).join('');
+
+                // Renderizza ogni scena
+                sceneIds.forEach(sceneId => {
+                    scenesContainer.appendChild(createSceneElement(sceneId, storyData.nodes[sceneId], sceneIds));
+                });
+            }
+
+            function createSceneElement(sceneId, scene, allSceneIds) {
+                const card = document.createElement('article');
+                card.className = 'scene-card';
+                card.dataset.sceneId = sceneId;
+
+                const choicesHTML = (scene.choices || []).map(choice => {
+                    const optionsHTML = allSceneIds.map(id => 
+                        `<option value="${id}" ${choice.leads_to === id ? 'selected' : ''}>${id}</option>`
+                    ).join('');
+
+                    return `
+                        <div class="choice-row">
+                            <input type="text" class="choice-text" value="${choice.text}" placeholder="Testo della scelta">
+                            <select class="choice-leads-to">${optionsHTML}</select>
+                            <button class="remove-btn remove-choice-btn">X</button>
+                        </div>
+                    `;
+                }).join('');
+
+                card.innerHTML = `
+                    <div class="scene-header">
+                        <input type="text" class="scene-id-input" value="${sceneId}" placeholder="ID Scena (es: start, foresta)">
+                        <button class="remove-btn remove-scene-btn">Rimuovi Scena</button>
+                    </div>
+                    <textarea class="scene-text" placeholder="Testo della scena...">${scene.text || ''}</textarea>
+                    <div class="choices-container">${choicesHTML}</div>
+                    <button class="outline add-choice-btn" style="margin-top: 1rem;">Aggiungi Scelta</button>
+                `;
+                return card;
+            }
+
+            function syncStoryDataFromDOM() {
+                const newNodes = {};
+                document.querySelectorAll('.scene-card').forEach(card => {
+                    const oldId = card.dataset.sceneId;
+                    const newId = card.querySelector('.scene-id-input').value.trim();
+                    if (!newId) return; // Salta le scene senza ID
+
+                    const text = card.querySelector('.scene-text').value;
+                    const choices = [];
+                    card.querySelectorAll('.choice-row').forEach(row => {
+                        const choiceText = row.querySelector('.choice-text').value.trim();
+                        const leads_to = row.querySelector('.choice-leads-to').value;
+                        if (choiceText) {
+                            choices.push({ text: choiceText, leads_to });
+                        }
+                    });
+
+                    newNodes[newId] = { text, choices };
+                    card.dataset.sceneId = newId; // Aggiorna l'ID nel DOM per coerenza
+                });
+
+                storyData.nodes = newNodes;
+                storyData.start_node = startNodeSelect.value;
+            }
+
+            addSceneBtn.addEventListener('click', () => {
+                syncStoryDataFromDOM();
+                const newSceneId = `scena_${Object.keys(storyData.nodes).length + 1}`;
+                if (storyData.nodes[newSceneId]) return; // Evita ID duplicati
+                storyData.nodes[newSceneId] = { text: "Nuova scena...", choices: [] };
+                render();
+            });
+
+            document.body.addEventListener('click', (e) => {
+                const sceneCard = e.target.closest('.scene-card');
+                if (!sceneCard) return;
+
+                if (e.target.classList.contains('remove-scene-btn')) {
+                    if (confirm('Sei sicuro di voler rimuovere questa scena?')) {
+                        syncStoryDataFromDOM();
+                        delete storyData.nodes[sceneCard.dataset.sceneId];
+                        render();
+                    }
+                } else if (e.target.classList.contains('add-choice-btn')) {
+                    syncStoryDataFromDOM();
+                    const scene = storyData.nodes[sceneCard.dataset.sceneId];
+                    if (scene) {
+                        if (!scene.choices) scene.choices = [];
+                        const firstSceneId = Object.keys(storyData.nodes)[0] || '';
+                        scene.choices.push({ text: "Nuova scelta", leads_to: firstSceneId });
+                    }
+                    render();
+                } else if (e.target.classList.contains('remove-choice-btn')) {
+                    syncStoryDataFromDOM();
+                    const scene = storyData.nodes[sceneCard.dataset.sceneId];
+                    if (scene && scene.choices) {
+                        const choiceRow = e.target.closest('.choice-row');
+                        const choiceIndex = Array.from(choiceRow.parentNode.children).indexOf(choiceRow);
+                        scene.choices.splice(choiceIndex, 1);
+                    }
+                    render();
+                }
+            });
+
+            startNodeSelect.addEventListener('change', () => {
+                storyData.start_node = startNodeSelect.value;
+            });
+
+            async function saveAllChanges() {
+                syncStoryDataFromDOM();
+
+                // Validazione finale: l'ID della scena iniziale deve esistere
+                if (!storyData.nodes[storyData.start_node]) {
+                    alert("Errore: la scena iniziale selezionata non esiste più. Selezionane un'altra.");
+                    return;
+                }
+
+                saveAllBtn.disabled = true;
+                saveAllBtn.textContent = 'Salvataggio...';
+                try {
+                    const response = await fetch(`/api/project/${projectName}/visual_data`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(storyData)
+                    });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.error || 'Errore sconosciuto');
+                    alert(result.message);
+                    // Ricarica i dati dal server per essere sicuri
+                    const freshResponse = await fetch(`/api/project/${projectName}/file/data.json`);
+                    const freshData = await freshResponse.json();
+                    storyData = freshData.content ? JSON.parse(freshData.content) : freshData;
+                    render();
+                } catch (error) {
+                    alert(`Errore durante il salvataggio: ${error.message}`);
+                } finally {
+                    saveAllBtn.disabled = false;
+                    saveAllBtn.textContent = 'Salva Tutte le Modifiche';
+                }
+            }
+
+            saveAllBtn.addEventListener('click', saveAllChanges);
+
+            initializeState();
+            render();
+        });
+    </script>
+</body>
+</html>

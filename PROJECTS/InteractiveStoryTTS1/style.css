@@ -1,0 +1,147 @@
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #f0f4f8;
+    color: #333;
+    margin: 0;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.game-container {
+    width: 100%;
+    max-width: 600px;
+    background-color: white;
+    padding: 20px 30px;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+#game-title {
+    color: #2c3e50;
+    margin-bottom: 20px;
+}
+
+.status-bar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 20px;
+    font-size: 1.1em;
+    color: #555;
+}
+
+.story-panel {
+    min-height: 100px;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    text-align: left;
+    line-height: 1.6;
+}
+
+.choices-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.choice-btn {
+    padding: 12px 20px;
+    font-size: 1em;
+    border: 1px solid #3498db;
+    background-color: #3498db;
+    color: white;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.2s;
+}
+
+.choice-btn:hover {
+    background-color: #2980b9;
+    transform: translateY(-2px);
+}
+
+/* Stili per il modale di fine gioco */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 30px;
+    border-radius: 10px;
+    text-align: center;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    width: 90%;
+    max-width: 450px;
+}
+
+.modal-content h2 {
+    margin-top: 0;
+    color: #2c3e50;
+}
+
+.modal-content p {
+    font-size: 1.1em;
+    margin: 10px 0;
+}
+
+#play-again-btn {
+    padding: 10px 20px;
+    font-size: 1em;
+    border: none;
+    border-radius: 5px;
+    background-color: #3498db;
+    color: white;
+    cursor: pointer;
+    margin-top: 15px;
+    transition: background-color 0.3s;
+}
+
+#play-again-btn:hover {
+    background-color: #2980b9;
+}
+
+/* Stili per il contenitore delle istruzioni e il pulsante Text-to-Speech */
+.instruction-container {
+    display: flex;
+    align-items: flex-start; /* Allinea in alto */
+    justify-content: center;
+    gap: 15px; /* Spazio tra testo e pulsante */
+    margin-bottom: 1.5rem;
+}
+
+#scene-text {
+    font-size: 1.2em;
+    line-height: 1.6;
+    color: #333;
+    text-align: left;
+    margin: 0;
+    flex-grow: 1;
+}
+
+.speak-btn {
+    background: none;
+    border: none;
+    font-size: 1.8em;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    color: #007bff;
+    transition: transform 0.2s;
+}
+.speak-btn:hover { transform: scale(1.1); }
