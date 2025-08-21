@@ -29,7 +29,7 @@ print("------------------------------------")
 # --- CONFIGURAZIONE EMAIL ---
 # Carica la chiave API e l'email del mittente dalle variabili d'ambiente per sicurezza e flessibilità.
 # NON inserire mai chiavi segrete direttamente nel codice.
-mailchimp_api_key = os.environ.get('MAILCHIMP_API_KEY') 
+mailchimp_api_key = os.environ.get('MAILCHIMP_API_KEY')
 SENDER_EMAIL_VERIFIED = os.environ.get('SENDER_EMAIL_VERIFIED')
 
 # Inizializza il client di Mailchimp Transactional
@@ -55,10 +55,7 @@ class GameResult(db.Model):
     def __repr__(self):
         return f'<GameResult {self.student_name} - {self.project_name}>'
 
-
-
 # --- Game Development Platform Core ---
-
 
 @app.route('/')
 def index():
@@ -126,7 +123,7 @@ def reports():
         flash("Impossibile caricare i report. Controllare la connessione al database.", "error")
         pagination = None
         students, projects, emails = [], [], []
-    
+
     return render_template('reports.html', pagination=pagination,
                            students=students, projects=projects, emails=emails,
                            selected_student=request.args.get('student_name', ''),
@@ -171,7 +168,7 @@ def create_project():
 
         if os.path.exists(project_path):
             return jsonify({'status': 'error', 'message': f'Un progetto di nome "{safe_project_name}" esiste già.'}), 409
-        
+
         if not os.path.isdir(template_path):
             return jsonify({'status': 'error', 'message': 'Il template selezionato non è valido.'}), 400
 
@@ -196,6 +193,7 @@ def create_project():
 
     # Per le richieste GET, mostra il modulo di creazione
     available_templates = get_available_templates()
+    print("Contenuto di 'available_templates':", available_templates)
     return render_template('create_project.html', templates=available_templates)
 
 @app.route('/launch/<string:project_name>')
@@ -211,7 +209,7 @@ def launch_game(project_name):
 def play_game(project_name):
     """Reindirizza al file index.html del gioco, mantenendo i parametri URL."""
     target_url = url_for('serve_project_file', project_name=project_name, filename='index.html')
-    
+
     query_string = request.query_string.decode('utf-8')
     if query_string:
         # Reindirizza aggiungendo i parametri all'URL di destinazione
@@ -245,7 +243,7 @@ def edit_project(project_name):
     # Elenca i file modificabili nella directory del progetto
     allowed_extensions = ('.html', '.css', '.js', '.json')
     files = [f for f in os.listdir(project_path) if os.path.isfile(os.path.join(project_path, f)) and f.endswith(allowed_extensions)]
-    
+
     return render_template('edit_project.html', project_name=project_name, files=files)
 
 @app.route('/visual_edit/<string:project_name>')
@@ -371,7 +369,7 @@ def submit_result(project_name):
     student_name = data.get('name', '').replace('\xa0', ' ').strip()
     clean_project_name = project_name.replace('\xa0', ' ').strip()
     recipient_email = data.get('email').strip()
-    
+
     # Usa l'email del mittente configurata tramite variabili d'ambiente.
     # Questa DEVE essere un'email appartenente a un dominio che hai verificato su Mailchimp.
     if not SENDER_EMAIL_VERIFIED:
@@ -515,7 +513,6 @@ def export_project(project_name):
         as_attachment=True
     )
 
-# RIATTIVARE QUESTA PARTE SE TORNO A LAVORARE IN LOCALE
 #if __name__ == '__main__':
     # Crea le tabelle del database se non esistono già.
     # Questo va eseguito una sola volta all'avvio dell'applicazione.
