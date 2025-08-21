@@ -515,6 +515,7 @@ def export_project(project_name):
         as_attachment=True
     )
 
+# RIATTIVARE QUESTA PARTE SE TORNO A LAVORARE IN LOCALE
 #if __name__ == '__main__':
     # Crea le tabelle del database se non esistono già.
     # Questo va eseguito una sola volta all'avvio dell'applicazione.
