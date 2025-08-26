@@ -129,25 +129,39 @@ def reports():
                            selected_student=request.args.get('student_name', ''),
                            selected_project=request.args.get('project_name', ''),
                            selected_email=request.args.get('student_email', ''))
-
 def get_available_templates():
     """Scansiona la cartella dei template e restituisce una lista di template disponibili."""
     templates = []
     templates_dir = app.config['TEMPLATES_FOLDER']
+    print(f"DEBUG: Directory dei template configurata su: {templates_dir}") # Stampa per debug
     if not os.path.isdir(templates_dir):
+        print(f"DEBUG: La cartella dei template {templates_dir} NON esiste.") # Stampa per debug
         return []
-    for t_name in os.listdir(templates_dir):
+
+    try:
+        # Tenta di listare i file nella cartella dei template
+        template_folders = os.listdir(templates_dir)
+        print(f"DEBUG: Trovate le seguenti cartelle dei template: {template_folders}") # Stampa per debug
+    except Exception as e:
+        print(f"ERRORE GRAVE: Impossibile listare la directory dei template. Errore: {e}")
+        return []
+
+    for t_name in template_folders:
         manifest_path = os.path.join(templates_dir, t_name, 'manifest.json')
+        print(f"DEBUG: Controllo il file manifest in: {manifest_path}") # Stampa per debug
         if os.path.isfile(manifest_path):
-            with open(manifest_path, 'r') as f:
+            print("DEBUG: Manifest trovato, provo a leggere il file.") # Stampa per debug
+            with open(manifest_path, 'r', encoding='utf-8') as f:
                 try:
                     manifest = json.load(f)
+                    print(f"DEBUG: Manifest letto con successo per {t_name}") # Stampa per debug
                     templates.append({
                         'id': t_name,
                         'name': manifest.get('name', t_name),
                         'description': manifest.get('description', 'Nessuna descrizione.')
                     })
                 except json.JSONDecodeError:
+                    print(f"ERRORE: Sintassi JSON non valida in {manifest_path}. Salto il template.") # Stampa per debug
                     continue # Salta i manifest corrotti
     return templates
 

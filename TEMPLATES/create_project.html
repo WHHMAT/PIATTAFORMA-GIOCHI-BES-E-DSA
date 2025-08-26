@@ -48,6 +48,7 @@
             <div class="template-selection-grid">
                 {% for template in templates %}
                 <div class="template-card">
+                    <p>Testo di prova</p>
                     <input type="radio" name="template_type" value="{{ template.id }}" id="template-{{ template.id }}" required>
                     <label for="template-{{ template.id }}">
                         <h3>{{ template.name }}</h3>
