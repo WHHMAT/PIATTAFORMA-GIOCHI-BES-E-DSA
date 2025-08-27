@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<style>
+    body { font-family: sans-serif; color: #333; }
+    .container { padding: 20px; border: 1px solid #ddd; border-radius: 8px; max-width: 600px; margin: auto; }
+    h1 { color: #0056b3; }
+    strong { color: #0056b3; }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>Risultati del Gioco</h1>
+    <p>Ciao,</p>
+    <p>Ecco il riepilogo della partita giocata da <strong>{{ name }}</strong>.</p>
+    <ul>
+        <li><strong>Gioco:</strong> {{ project_name }}</li>
+        <li><strong>Punteggio Finale:</strong> {{ score }}</li>
+        <li><strong>Tempo Impiegato:</strong> {{ time }}</li>
+    </ul>
+    <p>Saluti,<br>La Piattaforma Giochi</p>
+</div>
+</body>
+</html>

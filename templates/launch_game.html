@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avvia Gioco - {{ project_name }}</title>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f0f4f8; }
+        .container { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; }
+        input { display: block; width: 100%; padding: 0.8rem; margin: 1rem 0; font-size: 1rem; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        button { width: 100%; padding: 1rem; font-size: 1.1rem; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Avvia: {{ project_name }}</h1>
+        <p>Inserisci i dati per registrare il risultato.</p>
+        <form id="launch-form">
+            <input type="text" id="student-name" placeholder="Nome dello studente" required>
+            <input type="email" id="recipient-email" placeholder="Email del destinatario (es. insegnante)" required>
+            <button type="submit">Inizia il Gioco</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('launch-form').addEventListener('submit', function(event) {
+            event.preventDefault(); // Impedisce l'invio tradizionale del modulo
+
+            const name = document.getElementById('student-name').value;
+            const email = document.getElementById('recipient-email').value;
+
+            // Costruisce l'URL del gioco con i parametri
+            const gameUrl = `/play/{{ project_name }}?name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}`;
+
+            // Reindirizza l'utente al gioco
+            window.location.href = gameUrl;
+        });
+    </script>
+</body>
+</html>
+

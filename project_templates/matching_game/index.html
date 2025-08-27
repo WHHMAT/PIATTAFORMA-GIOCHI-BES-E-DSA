@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Collega gli Elementi</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-container">
+        <h1 id="game-title">Collega gli Elementi</h1>
+        <div class="status-bar">
+            <p>Coppie: <span id="score-count">0</span> / <span id="total-pairs">0</span></p>
+            <p>Tempo: <span id="timer">00:00</span></p>
+        </div>
+        <div class="instruction-container">
+            <p id="instruction-text">Clicca su un elemento a sinistra e poi sul suo corrispondente a destra.</p>
+            <button id="speak-btn" class="speak-btn" title="Ascolta le istruzioni">🔊</button>
+        </div>
+        <div class="matching-area">
+            <canvas id="lines-canvas"></canvas>
+            <div id="column-a" class="column"></div>
+            <div id="column-b" class="column"></div>
+        </div>
+        <div class="feedback-container"><p id="feedback-text"></p></div>
+        <button id="next-btn" class="hidden">Prossimo Livello</button>
+    </div>
+
+    <!-- Schermata di fine gioco -->
+    <div id="end-game-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2>Gioco Completato!</h2>
+            <p>Hai collegato tutti gli elementi.</p>
+            <div class="final-stats">
+                <p>Punteggio finale: <span id="final-score">0</span></p>
+                <p>Tempo totale: <span id="final-time">00:00</span></p>
+            </div>
+            <button id="play-again-btn">Gioca Ancora</button>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

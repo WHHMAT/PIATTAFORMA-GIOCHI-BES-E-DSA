@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Labirinto Logico</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-container">
+        <h1>Labirinto Logico</h1>
+        <div class="status-bar">
+            <p>Mosse: <span id="moves-count">0</span></p>
+            <p>Tempo: <span id="timer">00:00</span></p>
+        </div>
+        
+        <div class="instruction-container">
+            <p id="instruction-text" class="instructions"></p>
+            <button id="speak-btn" class="speak-btn" title="Ascolta le istruzioni">🔊</button>
+        </div>
+
+        <div id="maze-container">
+            <!-- Il labirinto verrà generato qui dal JavaScript -->
+        </div>
+
+        <div id="controls">
+            <button id="up-btn">↑</button>
+            <button id="left-btn">←</button>
+            <button id="down-btn">↓</button>
+            <button id="right-btn">→</button>
+        </div>
+    </div>
+
+    <!-- Schermata di fine gioco -->
+    <div id="end-game-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2>Ce l'hai fatta!</h2>
+            <p>Hai completato il labirinto.</p>
+            <p>Mosse totali: <span id="final-moves">0</span></p>
+            <p>Tempo impiegato: <span id="final-time">00:00</span></p>
+            <button id="play-again-btn">Gioca Ancora</button>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

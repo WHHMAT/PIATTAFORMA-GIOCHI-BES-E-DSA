@@ -1,0 +1,115 @@
+<head>
+    <meta charset="UTF-8">
+    <title>Crea Nuovo Progetto</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Toastify CSS -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <style>
+        /* Stili aggiuntivi per rendere le card dei template cliccabili */
+        .template-card {
+            position: relative; /* Necessario per posizionare l'input radio */
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            /* Spostiamo lo stile visivo dalla label (il rettangolo interno) alla card esterna */
+            border: 2px solid transparent; /* Aggiungiamo un bordo trasparente per evitare scatti al cambio di stato */
+            border-radius: 8px;
+        }
+
+        /* Assicuriamoci che la label interna non abbia un suo bordo che creerebbe un doppio riquadro */
+        .template-card label {
+            /* Rimuoviamo il bordo interno per avere un solo riquadro di selezione */
+            border: none;
+        }
+
+        .template-card input[type="radio"] {
+            /* Nasconde il pallino del radio button ma lo lascia funzionante e cliccabile */
+            opacity: 0;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        /* Stile per il riquadro grande quando il radio button al suo interno è selezionato */
+        .template-card:has(input[type="radio"]:checked) {
+            border-color: #dc3545; /* Bordo rosso */
+            box-shadow: 0 0 8px rgba(220, 53, 69, 0.4); /* Ombra rossa più morbida */
+        }
+    </style>
+</head>
+<body>
+    {{ templates }}
+    <div class="container">
+        <h1>Crea un Nuovo Progetto di Gioco</h1>
+
+        <form id="create-project-form" action="{{ url_for('create_project') }}" method="post">
+            <h2>1. Scegli un Template</h2>
+            <div class="template-selection-grid">
+                {% for template in templates %}
+                <div class="template-card">
+                    <p>Testo di prova</p>
+                    <input type="radio" name="template_type" value="{{ template.id }}" id="template-{{ template.id }}" required>
+                    <label for="template-{{ template.id }}">
+                        <h3>{{ template.name }}</h3>
+                        <p>{{ template.description }}</p>
+                    </label>
+                </div>
+                {% endfor %}
+            </div>
+
+            <h2>2. Dai un Nome al Progetto</h2>
+            <input type="text" name="project_name" placeholder="Nome del mio nuovo gioco" required>
+
+            <button type="submit" class="button">Crea Progetto</button>
+        </form>
+        <a href="{{ url_for('dashboard') }}" class="button secondary">Torna alla Dashboard</a>
+    </div>
+
+    <!-- Toastify JS -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <script>
+        // Funzione helper per mostrare le notifiche toast
+        function showToast(message, type = 'success') {
+            Toastify({
+                text: message,
+                duration: 3500,
+                close: true,
+                gravity: "top",
+                position: "right",
+                backgroundColor: type === 'success' ? "linear-gradient(to right, #00b09b, #96c93d)" : "linear-gradient(to right, #ff5f6d, #ffc371)",
+                stopOnFocus: true,
+            }).showToast();
+        }
+
+        // Gestione asincrona della creazione del progetto
+        const createForm = document.getElementById('create-project-form');
+        createForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(createForm);
+            const submitButton = createForm.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+
+            try {
+                const response = await fetch(createForm.action, {
+                    method: 'POST',
+                    body: new URLSearchParams(formData) // Invia come dati form
+                });
+                const result = await response.json();
+                showToast(result.message, result.status);
+
+                if (response.ok) {
+                    // Reindirizza alla dashboard dopo un breve ritardo per far vedere il toast
+                    setTimeout(() => { window.location.href = result.redirect_url; }, 1500);
+                } else {
+                    submitButton.disabled = false;
+                }
+            } catch (error) {
+                showToast('Errore di connessione con il server.', 'error');
+                submitButton.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+[
+  {
+    "instruction": "Abbina la parola italiana alla sua traduzione in inglese.",
+    "pairs": [
+      {
+        "id": 1,
+        "itemA": { "text": "Gatto" },
+        "itemB": { "text": "Cat" }
+      },
+      {
+        "id": 2,
+        "itemA": { "text": "Cane" },
+        "itemB": { "text": "Dog" }
+      },
+      {
+        "id": 3,
+        "itemA": { "text": "Casa" },
+        "itemB": { "text": "House" }
+      },
+      {
+        "id": 4,
+        "itemA": { "text": "Libro" },
+        "itemB": { "text": "Book" }
+      }
+    ]
+  },
+  {
+    "instruction": "Abbina la capitale al suo stato.",
+    "pairs": [
+      { "id": 5, "itemA": { "text": "Italia" }, "itemB": { "text": "Roma" } },
+      { "id": 6, "itemA": { "text": "Francia" }, "itemB": { "text": "Parigi" } },
+      { "id": 7, "itemA": { "text": "Spagna" }, "itemB": { "text": "Madrid" } }
+    ]
+  }
+]

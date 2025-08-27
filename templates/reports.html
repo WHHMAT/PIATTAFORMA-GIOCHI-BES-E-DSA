@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report Risultati - Piattaforma Giochi</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <style>
+        body > main {
+            padding: 1rem;
+        }
+        .container {
+            max-width: 1200px;
+            margin: auto;
+        }
+        nav a {
+            margin-right: 1rem;
+        }
+        .table-responsive {
+            overflow-x: auto;
+        }
+        .no-results {
+            text-align: center;
+            padding: 2rem;
+            border: 1px dashed var(--muted-border-color);
+            border-radius: var(--border-radius);
+        }
+        .filter-form {
+            background-color: var(--card-background-color);
+            border: 1px solid var(--card-border-color);
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 2rem;
+        }
+        .filter-form .grid { margin-bottom: 1rem; }
+        .filter-form .grid:last-child { margin-bottom: 0; }
+
+        /* Stili per la paginazione */
+        .pagination-nav {
+            margin-top: 2rem;
+            display: flex;
+            justify-content: center;
+        }
+        .pagination-nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            gap: 0.25rem;
+        }
+        .pagination-nav a[aria-current="page"] {
+            background-color: var(--primary);
+            color: var(--primary-inverse);
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <nav>
+            <a href="{{ url_for('dashboard') }}">← Torna alla Dashboard</a>
+        </nav>
+        
+        <h1 style="margin-top: 1rem;">Report Risultati Giochi</h1>
+        <p>Filtra i risultati per studente o per gioco, oppure visualizza tutti i tentativi registrati.</p>
+
+        <!-- Sezione Filtri -->
+        <form method="GET" action="{{ url_for('reports') }}" class="filter-form">
+            <div class="grid">
+                <!-- Filtro per Studente -->
+                <select name="student_name" id="student_name">
+                    <option value="">Tutti gli Studenti</option>
+                    {% for student in students %}
+                        <option value="{{ student }}" {% if student == selected_student %}selected{% endif %}>{{ student }}</option>
+                    {% endfor %}
+                </select>
+
+                <!-- Filtro per Gioco -->
+                <select name="project_name" id="project_name">
+                    <option value="">Tutti i Giochi</option>
+                    {% for project in projects %}
+                        <option value="{{ project }}" {% if project == selected_project %}selected{% endif %}>{{ project }}</option>
+                    {% endfor %}
+                </select>
+
+                <!-- Filtro per Email -->
+                <select name="student_email" id="student_email">
+                    <option value="">Tutte le Email</option>
+                    {% for email in emails %}
+                        <option value="{{ email }}" {% if email == selected_email %}selected{% endif %}>{{ email }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="grid"><button type="submit">Filtra</button><a href="{{ url_for('reports') }}" role="button" class="secondary">Rimuovi Filtri</a></div>
+        </form>
+
+        {% if pagination and pagination.items %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Data e Ora</th>
+                            <th>Studente</th>
+                            <th>Gioco</th>
+                            <th>Punteggio</th>
+                            <th>Tempo Impiegato</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for result in pagination.items %}
+                        <tr>
+                            <td>{{ result.timestamp.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td>{{ result.student_name }}<br><small>{{ result.student_email }}</small></td>
+                            <td>{{ result.project_name }}</td>
+                            <td>{{ result.score }}</td>
+                            <td>{{ result.time_spent }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Sezione Paginazione -->
+            {% if pagination.pages > 1 %}
+            <nav class="pagination-nav" aria-label="Navigazione pagine">
+                <ul>
+                    <!-- Link alla pagina precedente -->
+                    <li><a href="{{ url_for('reports', page=pagination.prev_num, **request.args) if pagination.has_prev else '#' }}" {% if not pagination.has_prev %}class="secondary" disabled{% endif %}>‹ Precedente</a></li>
+
+                    <!-- Link alle pagine numerate -->
+                    {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                        {% if p %}
+                            <li><a href="{{ url_for('reports', page=p, **request.args) }}" {% if p == pagination.page %}aria-current="page"{% endif %}>{{ p }}</a></li>
+                        {% else %}
+                            <li><span class="ellipsis">&hellip;</span></li>
+                        {% endif %}
+                    {% endfor %}
+
+                    <!-- Link alla pagina successiva -->
+                    <li><a href="{{ url_for('reports', page=pagination.next_num, **request.args) if pagination.has_next else '#' }}" {% if not pagination.has_next %}class="secondary" disabled{% endif %}>Successiva ›</a></li>
+                </ul>
+            </nav>
+            {% endif %}
+
+        {% else %}
+            <div class="no-results">
+                <h2>Nessun risultato ancora registrato.</h2>
+                <p>Completa un gioco per vedere i risultati apparire qui.</p>
+            </div>
+        {% endif %}
+    </main>
+</body>
+</html>
