@@ -1,0 +1,36 @@
+{
+  "images": [
+    {
+      "id": "mela",
+      "url": "https://raw.githubusercontent.com/WHHMAT/PIATTAFORMA-GIOCHI-BES-E-DSA/master/memory/img/mela.svg"
+    },
+    {
+      "id": "pera",
+      "url": "https://raw.githubusercontent.com/WHHMAT/PIATTAFORMA-GIOCHI-BES-E-DSA/master/memory/img/pera.svg"
+    },
+    {
+      "id": "banana",
+      "url": "https://raw.githubusercontent.com/WHHMAT/PIATTAFORMA-GIOCHI-BES-E-DSA/master/memory/img/banana.svg"
+    },
+    {
+      "id": "fragola",
+      "url": "https://raw.githubusercontent.com/WHHMAT/PIATTAFORMA-GIOCHI-BES-E-DSA/master/memory/img/fragola.svg"
+    },
+    {
+      "id": "ciliegia",
+      "url": "https://raw.githubusercontent.com/WHHMAT/PIATTAFORMA-GIOCHI-BES-E-DSA/master/memory/img/ciliegia.svg"
+    },
+    {
+      "id": "arancia",
+      "url": "https://raw.githubusercontent.com/WHHMAT/PIATTAFORMA-GIOCHI-BES-E-DSA/master/memory/img/arancia.svg"
+    },
+    {
+      "id": "limone",
+      "url": "https://raw.githubusercontent.com/WHHMAT/PIATTAFORMA-GIOCHI-BES-E-DSA/master/memory/img/limone.svg"
+    },
+    {
+      "id": "kiwi",
+      "url": "https://raw.githubusercontent.com/WHHMAT/PIATTAFORMA-GIOCHI-BES-E-DSA/master/memory/img/kiwi.svg"
+    }
+  ]
+}
