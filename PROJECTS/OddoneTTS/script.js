@@ -39,11 +39,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Funzione per la sintesi vocale (Text-to-Speech)
     function speakText(text) {
         if ('speechSynthesis' in window) {
-            // Ferma qualsiasi discorso precedente per evitare sovrapposizioni
             window.speechSynthesis.cancel();
             
             const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'it-IT'; // Imposta la lingua italiana
+            utterance.lang = 'it-IT';
             window.speechSynthesis.speak(utterance);
         } else {
             alert("Il tuo browser non supporta la sintesi vocale.");
@@ -68,7 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const level = gameData[levelIndex];
-        questionTextEl.textContent = level.instruction;
+        questionTextEl.textContent = level.question;
         
         // Pulisce lo stato precedente
         itemsGridEl.innerHTML = '';
@@ -81,9 +80,9 @@ document.addEventListener('DOMContentLoaded', () => {
         level.items.forEach(itemData => {
             const itemEl = document.createElement('div');
             itemEl.classList.add('item');
-            itemEl.textContent = itemData.content;
+            itemEl.textContent = itemData.text;
             
-            itemEl.addEventListener('click', () => handleItemClick(itemEl, itemData.content === level.intruder));
+            itemEl.addEventListener('click', () => handleItemClick(itemEl, itemData.is_intruder));
             itemsGridEl.appendChild(itemEl);
         });
     }
@@ -118,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Evidenzia anche la risposta corretta per aiutare l'apprendimento
             const allItemElements = Array.from(itemsGridEl.children);
-            const correctIndex = gameData[currentLevelIndex].items.findIndex(item => item.content === gameData[currentLevelIndex].intruder);
+            const correctIndex = gameData[currentLevelIndex].items.findIndex(item => item.is_intruder === true);
             if (correctIndex !== -1) {
                 allItemElements[correctIndex].classList.add('correct');
             }
@@ -153,7 +152,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 7. Invia i risultati al server
     async function sendResultsToServer() {
-        // Invia solo se nome e email sono presenti
         if (!studentInfo.name || !studentInfo.email) {
             console.log("Dati studente non trovati, invio email saltato.");
             return;
