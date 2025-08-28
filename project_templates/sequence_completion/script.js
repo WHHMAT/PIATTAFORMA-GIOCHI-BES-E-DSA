@@ -1,7 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // --- DATI DEL GIOCO ---
-    let gameData = [];
-
     // --- ELEMENTI DEL DOM ---
     const instructionTextEl = document.getElementById('instruction-text');
     const sequenceContainerEl = document.getElementById('sequence-container');
@@ -22,11 +19,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let score = 0;
     let timerInterval = null;
     let seconds = 0;
-    let studentInfo = {};
 
-    // 0. Recupera i dati dello studente dall'URL
-    const urlParams = new URLSearchParams(window.location.search);
-    studentInfo = { name: urlParams.get('name'), email: urlParams.get('email') };
+    // 0. Le variabili `gameData` e `gameId` sono ora globali e disponibili
+    //    Rimuovi il recupero dei dati dello studente dall'URL.
+    //    const urlParams = new URLSearchParams(window.location.search);
+    //    studentInfo = { name: urlParams.get('name'), email: urlParams.get('email') };
 
     // Funzione per la sintesi vocale (Text-to-Speech)
     function speakText(text) {
@@ -40,18 +37,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 1. Carica i dati del gioco dal file JSON
-    async function loadGameData() {
-        try {
-            const response = await fetch('data.json');
-            if (!response.ok) throw new Error(`Errore HTTP: ${response.status}`);
-            gameData = await response.json();
-            initGame();
-        } catch (error) {
-            console.error("Errore nel caricamento di data.json:", error);
-            instructionTextEl.textContent = "Errore: impossibile caricare i dati del gioco.";
-        }
-    }
+    // 1. Rimuovi la funzione loadGameData()
+    //    Il gioco userà direttamente la variabile `gameData` passata dal server.
+    //    async function loadGameData() { ... }
 
     // 2. Inizializza o resetta il gioco
     function initGame() {
@@ -59,8 +47,14 @@ document.addEventListener('DOMContentLoaded', () => {
         score = 0;
         scoreCountEl.textContent = score;
         modalEl.style.display = 'none';
-        loadLevel(currentLevelIndex);
-        startTimer();
+        
+        // Controlla se `gameData` esiste prima di caricarlo
+        if (typeof gameData !== 'undefined' && gameData.length > 0) {
+            loadLevel(currentLevelIndex);
+            startTimer();
+        } else {
+            instructionTextEl.textContent = "Errore: impossibile caricare i dati del gioco.";
+        }
     }
 
     // 3. Carica un livello specifico
@@ -146,19 +140,46 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1000);
     }
 
-    // 7. Invia i risultati al server (funzione standard)
+    // 7. Invia i risultati al server (funzione modificata)
     async function sendResultsToServer() {
-        if (!studentInfo.name || !studentInfo.email) return;
-        const projectName = window.location.pathname.split('/')[2];
-        const payload = { ...studentInfo, score: `${score} / ${gameData.length}`, time: timerEl.textContent };
+        // Chiedi i dati allo studente
+        const studentName = prompt("Complimenti! Inserisci il tuo nome per inviare i risultati all'insegnante:");
+        const studentEmail = prompt("Ora inserisci la tua email:");
+
+        if (!studentName || !studentEmail) {
+            alert("Risultati non inviati. I campi sono obbligatori.");
+            return;
+        }
+
+        const payload = {
+            name: studentName,
+            email: studentEmail,
+            score: `${score} / ${gameData.length}`,
+            time: timerEl.textContent,
+        };
+
         try {
-            await fetch(`/api/submit_result/${projectName}`, {
+            // L'ID del gioco viene preso dalla variabile globale `gameId`
+            const response = await fetch(`/api/submit_result/${gameId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
+
+            if (!response.ok) {
+                throw new Error('Errore durante l\'invio dei risultati.');
+            }
+            
+            const result = await response.json();
+            if (result.status === 'success') {
+                alert("Risultati inviati con successo all'insegnante!");
+            } else {
+                alert(`Errore nell'invio dei risultati: ${result.message}`);
+            }
+
         } catch (error) {
             console.error("Errore nell'invio dei risultati:", error);
+            alert("Errore di rete. Impossibile inviare i risultati.");
         }
     }
 
@@ -171,5 +192,5 @@ document.addEventListener('DOMContentLoaded', () => {
     speakBtn.addEventListener('click', () => speakText(instructionTextEl.textContent));
 
     // 9. Inizia il gioco
-    loadGameData();
+    initGame();
 });

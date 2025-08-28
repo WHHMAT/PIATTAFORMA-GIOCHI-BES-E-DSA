@@ -1,24 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // --- DATI DEL GIOCO ---
-    // Modifica questo array per cambiare le domande e le risposte del quiz.
-    const gameData = [
-        {
-            question: "Qual è la capitale d'Italia?",
-            options: ["Parigi", "Roma", "Berlino", "Madrid"],
-            answer: "Roma"
-        },
-        {
-            question: "Quanto fa 2 + 2?",
-            options: ["3", "4", "5", "6"],
-            answer: "4"
-        },
-        {
-            question: "Quale pianeta è conosciuto come il 'Pianeta Rosso'?",
-            options: ["Venere", "Marte", "Giove", "Saturno"],
-            answer: "Marte"
-        }
-    ];
-
     // --- ELEMENTI DEL DOM ---
     const questionTitleEl = document.getElementById('question-title');
     const optionsContainerEl = document.getElementById('options-container');
@@ -38,11 +18,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let score = 0;
     let timerInterval = null;
     let seconds = 0;
-    let studentInfo = {};
 
-    // 0. Recupera i dati dello studente dall'URL
-    const urlParams = new URLSearchParams(window.location.search);
-    studentInfo = { name: urlParams.get('name'), email: urlParams.get('email') };
+    // 0. Le variabili `gameData` e `gameId` sono ora globali e disponibili.
+    //    Rimuovi il recupero dei dati dello studente dall'URL.
+    //    La richiesta delle informazioni avverrà alla fine del gioco.
+    //    const urlParams = new URLSearchParams(window.location.search);
+    //    studentInfo = { name: urlParams.get('name'), email: urlParams.get('email') };
 
     // Funzione per la sintesi vocale (Text-to-Speech)
     function speakText(text) {
@@ -70,7 +51,13 @@ document.addEventListener('DOMContentLoaded', () => {
         optionsContainerEl.style.display = 'grid';
         
         startTimer();
-        loadQuestion(currentQuestionIndex);
+        
+        // Controlla se `gameData` esiste prima di caricarlo
+        if (typeof gameData !== 'undefined' && gameData.length > 0) {
+            loadQuestion(currentQuestionIndex);
+        } else {
+            questionTitleEl.textContent = "Errore: impossibile caricare i dati del gioco.";
+        }
     }
 
     // 2. Carica una domanda specifica
@@ -158,29 +145,45 @@ document.addEventListener('DOMContentLoaded', () => {
         modalEl.style.display = 'flex';
     }
 
-    // 6. Invia i risultati al server
+    // 6. Invia i risultati al server (funzione modificata)
     async function sendResultsToServer() {
-        // Invia solo se nome e email sono presenti
-        if (!studentInfo.name || !studentInfo.email) {
-            console.log("Dati studente non trovati, invio email saltato.");
+        const studentName = prompt("Complimenti! Inserisci il tuo nome per inviare i risultati all'insegnante:");
+        const studentEmail = prompt("Ora inserisci la tua email:");
+
+        if (!studentName || !studentEmail) {
+            alert("Risultati non inviati. I campi sono obbligatori.");
             return;
         }
 
-        const projectName = window.location.pathname.split('/')[2];
         const payload = {
-            ...studentInfo,
+            name: studentName,
+            email: studentEmail,
             score: `${score} / ${gameData.length}`,
             time: timerEl.textContent,
         };
 
         try {
-            await fetch(`/api/submit_result/${projectName}`, {
+            // L'ID del gioco viene preso dalla variabile globale `gameId`
+            const response = await fetch(`/api/submit_result/${gameId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
+
+            if (!response.ok) {
+                 throw new Error('Errore durante l\'invio dei risultati.');
+            }
+            
+            const result = await response.json();
+            if (result.status === 'success') {
+                alert("Risultati inviati con successo all'insegnante!");
+            } else {
+                alert(`Errore nell'invio dei risultati: ${result.message}`);
+            }
+
         } catch (error) {
             console.error("Errore nell'invio dei risultati:", error);
+            alert("Errore di rete. Impossibile inviare i risultati.");
         }
     }
 

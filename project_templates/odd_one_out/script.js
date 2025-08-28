@@ -17,24 +17,15 @@ document.addEventListener('DOMContentLoaded', () => {
     let score = 0;
     let timerInterval = null;
     let seconds = 0;
-    let studentInfo = {};
 
-    // 0. Recupera i dati dello studente dall'URL
-    const urlParams = new URLSearchParams(window.location.search);
-    studentInfo = { name: urlParams.get('name'), email: urlParams.get('email') };
+    // 0. Le variabili `gameData` e `gameId` sono ora globali e disponibili.
+    //    Rimuovi il recupero dei dati dello studente dall'URL.
+    //    const urlParams = new URLSearchParams(window.location.search);
+    //    studentInfo = { name: urlParams.get('name'), email: urlParams.get('email') };
 
-    // 1. Carica i dati del gioco dal file JSON
-    async function loadGameData() {
-        try {
-            const response = await fetch('data.json');
-            if (!response.ok) throw new Error(`Errore HTTP: ${response.status}`);
-            gameData = await response.json();
-            initGame();
-        } catch (error) {
-            console.error("Errore nel caricamento di data.json:", error);
-            questionTextEl.textContent = "Errore: impossibile caricare i dati del gioco.";
-        }
-    }
+    // 1. Rimuovi la funzione loadGameData()
+    //    Il gioco userà direttamente la variabile `gameData` passata dal server.
+    //    async function loadGameData() { ... }
 
     // Funzione per la sintesi vocale (Text-to-Speech)
     function speakText(text) {
@@ -67,22 +58,34 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const level = gameData[levelIndex];
-        questionTextEl.textContent = level.question; // Corretto: usa 'question'
+        questionTextEl.textContent = level.question;
         
-        // Pulisce lo stato precedente
         itemsGridEl.innerHTML = '';
         itemsGridEl.classList.remove('disabled');
         feedbackTextEl.textContent = '';
         feedbackTextEl.className = '';
         nextBtn.classList.add('hidden');
 
-        // Crea e aggiunge gli elementi del livello corrente
         level.items.forEach(itemData => {
             const itemEl = document.createElement('div');
             itemEl.classList.add('item');
-            itemEl.textContent = itemData.text; // Corretto: usa 'text'
             
-            itemEl.addEventListener('click', () => handleItemClick(itemEl, itemData.is_intruder)); // Corretto: usa 'is_intruder'
+            // Aggiungi immagine o testo a seconda della presenza di `image`
+            if (itemData.image) {
+                const img = document.createElement('img');
+                img.src = itemData.image;
+                img.alt = itemData.text;
+                itemEl.appendChild(img);
+                if (itemData.text) {
+                    const span = document.createElement('span');
+                    span.textContent = itemData.text;
+                    itemEl.appendChild(span);
+                }
+            } else {
+                itemEl.textContent = itemData.text;
+            }
+            
+            itemEl.addEventListener('click', () => handleItemClick(itemEl, itemData.is_intruder));
             itemsGridEl.appendChild(itemEl);
         });
     }
@@ -115,19 +118,17 @@ document.addEventListener('DOMContentLoaded', () => {
             feedbackTextEl.textContent = "Sbagliato!";
             feedbackTextEl.classList.add('incorrect');
             
-            // Evidenzia anche la risposta corretta per aiutare l'apprendimento
             const allItemElements = Array.from(itemsGridEl.children);
-            const correctIndex = gameData[currentLevelIndex].items.findIndex(item => item.is_intruder === true); // Corretto: trova l'intruso
+            const correctIndex = gameData[currentLevelIndex].items.findIndex(item => item.is_intruder === true);
             if (correctIndex !== -1) {
                 allItemElements[correctIndex].classList.add('correct');
             }
         }
 
-        // Mostra il pulsante per andare avanti, se non è l'ultimo livello
         if (currentLevelIndex < gameData.length - 1) {
             nextBtn.classList.remove('hidden');
         } else {
-            setTimeout(showGameEnd, 2000); // Mostra la fine dopo un breve ritardo
+            setTimeout(showGameEnd, 2000);
         }
     }
 
@@ -135,14 +136,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function showGameEnd() {
         clearInterval(timerInterval);
 
-        // Popola il modale con i dati finali
         finalScoreEl.textContent = score;
         totalLevelsEl.textContent = gameData.length;
         finalTimeEl.textContent = timerEl.textContent;
 
-        sendResultsToServer(); // Invia i risultati al server
+        sendResultsToServer();
 
-        // Nasconde gli elementi del gioco e mostra il modale
         questionTextEl.textContent = "Gioco completato!";
         itemsGridEl.innerHTML = '';
         feedbackTextEl.textContent = '';
@@ -150,29 +149,46 @@ document.addEventListener('DOMContentLoaded', () => {
         modalEl.style.display = 'flex';
     }
 
-    // 7. Invia i risultati al server
+    // 7. Invia i risultati al server (funzione modificata)
     async function sendResultsToServer() {
-        if (!studentInfo.name || !studentInfo.email) {
-            console.log("Dati studente non trovati, invio email saltato.");
+        // Chiedi i dati allo studente
+        const studentName = prompt("Complimenti! Inserisci il tuo nome per inviare i risultati all'insegnante:");
+        const studentEmail = prompt("Ora inserisci la tua email:");
+
+        if (!studentName || !studentEmail) {
+            alert("Risultati non inviati. I campi sono obbligatori.");
             return;
         }
-
-        const pathParts = window.location.pathname.split('/');
-        const projectName = pathParts[pathParts.length - 2];
+        
         const payload = {
-            ...studentInfo,
+            name: studentName,
+            email: studentEmail,
             score: `${score} / ${gameData.length}`,
             time: timerEl.textContent,
         };
 
         try {
-            await fetch(`/api/submit_result/${projectName}`, {
+            // L'ID del gioco viene preso dalla variabile globale `gameId`
+            const response = await fetch(`/api/submit_result/${gameId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
+
+            if (!response.ok) {
+                 throw new Error('Errore durante l\'invio dei risultati.');
+            }
+            
+            const result = await response.json();
+            if (result.status === 'success') {
+                alert("Risultati inviati con successo all'insegnante!");
+            } else {
+                alert(`Errore nell'invio dei risultati: ${result.message}`);
+            }
+
         } catch (error) {
             console.error("Errore nell'invio dei risultati:", error);
+            alert("Errore di rete. Impossibile inviare i risultati.");
         }
     }
 
@@ -188,5 +204,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // 9. Inizia il gioco
-    loadGameData();
+    // Usa la variabile globale `gameData` per inizializzare il gioco
+    if (typeof gameData !== 'undefined' && gameData.length > 0) {
+        initGame();
+    } else {
+        questionTextEl.textContent = "Errore: impossibile caricare i dati del gioco.";
+    }
 });

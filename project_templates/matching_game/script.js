@@ -17,18 +17,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const speakBtn = document.getElementById('speak-btn');
 
     // --- VARIABILI DI STATO ---
-    let gameData = [];
+    // Le variabili gameData e gameId sono ora globali e disponibili grazie al template Python.
+    // Rimuovi la loro inizializzazione qui.
     let currentLevelIndex = 0;
     let selection = { itemA: null, itemB: null };
     let score = 0;
     let matchedPairs = [];
     let timerInterval = null;
     let seconds = 0;
-    let studentInfo = {};
 
-    // 0. Recupera i dati dello studente dall'URL
-    const urlParams = new URLSearchParams(window.location.search);
-    studentInfo = { name: urlParams.get('name'), email: urlParams.get('email') };
+    // 0. Rimuovi la parte che legge i dati dello studente dall'URL
+    // Non è più necessario usare URLSearchParams
+    // const urlParams = new URLSearchParams(window.location.search);
+    // studentInfo = { name: urlParams.get('name'), email: urlParams.get('email') };
 
     // 1. Funzione per mescolare un array (Fisher-Yates)
     function shuffle(array) {
@@ -38,27 +39,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 2. Carica i dati del gioco dal file JSON
-    async function loadGameData() {
-        try {
-            const response = await fetch('data.json');
-            if (!response.ok) throw new Error(`Errore HTTP: ${response.status}`);
-            gameData = await response.json();
-            initGame();
-        } catch (error) {
-            console.error("Errore nel caricamento di data.json:", error);
-            instructionTextEl.textContent = "Errore: impossibile caricare i dati del gioco.";
-        }
-    }
+    // 2. Rimuovi la funzione loadGameData().
+    // I dati sono già disponibili nella variabile globale `gameData`.
 
     // Funzione per la sintesi vocale (Text-to-Speech)
     function speakText(text) {
         if ('speechSynthesis' in window) {
-            // Ferma qualsiasi discorso precedente per evitare sovrapposizioni
             window.speechSynthesis.cancel();
-            
             const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'it-IT'; // Imposta la lingua italiana
+            utterance.lang = 'it-IT';
             window.speechSynthesis.speak(utterance);
         } else {
             alert("Il tuo browser non supporta la sintesi vocale.");
@@ -67,6 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 3. Inizializza o resetta il gioco
     function initGame() {
+        // La variabile globale `gameData` è già popolata dal server.
         currentLevelIndex = 0;
         score = 0;
         modalEl.style.display = 'none';
@@ -77,6 +67,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // 4. Carica un livello specifico
     function loadLevel(levelIndex) {
         const level = gameData[levelIndex];
+        if (!level) {
+            // Gestisci il caso in cui non ci sono più livelli
+            showGameEnd();
+            return;
+        }
+
         instructionTextEl.textContent = level.instruction;
 
         // Reset stato del livello
@@ -111,7 +107,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (itemData.image) {
             itemEl.style.backgroundImage = `url(${itemData.image})`;
             itemEl.classList.add('has-image');
-            // Aggiunge un'etichetta di testo se presente
             if (itemData.text) {
                 const textOverlay = document.createElement('span');
                 textOverlay.classList.add('text-overlay');
@@ -119,7 +114,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 itemEl.appendChild(textOverlay);
             }
         } else {
-            // Se non c'è immagine, usa solo il testo
             itemEl.textContent = itemData.text;
         }
 
@@ -157,14 +151,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const itemA = selection.itemA;
         const itemB = selection.itemB;
 
-        // Resetta la selezione per il prossimo turno
         selection = { itemA: null, itemB: null };
 
-        // Rimuove subito la classe 'selected' da entrambi
         itemA.classList.remove('selected');
         itemB.classList.remove('selected');
 
-        if (itemA.dataset.id === itemB.dataset.id) { // Corrispondenza corretta
+        if (itemA.dataset.id === itemB.dataset.id) {
             itemA.classList.add('matched');
             itemB.classList.add('matched');
 
@@ -180,15 +172,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     showGameEnd();
                 }
             }
-        } else { // Corrispondenza sbagliata
+        } else {
             itemA.classList.add('incorrect-shake');
             itemB.classList.add('incorrect-shake');
-            drawLine(itemA, itemB, '#dc3545'); // Disegna una linea rossa temporanea
+            drawLine(itemA, itemB, '#dc3545');
             
             setTimeout(() => {
                 itemA.classList.remove('incorrect-shake');
                 itemB.classList.remove('incorrect-shake');
-                redrawAllLines(); // Rimuove la linea rossa e ridisegna solo quelle corrette
+                redrawAllLines();
             }, 500);
         }
     }
@@ -198,10 +190,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const rect = element.getBoundingClientRect();
         const containerRect = canvas.getBoundingClientRect();
 
-        // Calcola le coordinate X e Y relative al canvas
         const x = fromColumn === 'A' 
-            ? rect.right - containerRect.left - 2  // Bordo destro dell'elemento
-            : rect.left - containerRect.left + 2; // Bordo sinistro dell'elemento
+            ? rect.right - containerRect.left - 2
+            : rect.left - containerRect.left + 2;
 
         const y = rect.top - containerRect.top + rect.height / 2;
         return { x, y };
@@ -248,36 +239,51 @@ document.addEventListener('DOMContentLoaded', () => {
         finalScoreEl.textContent = score;
         finalTimeEl.textContent = timerEl.textContent;
 
-        sendResultsToServer(); // Invia i risultati
-
+        sendResultsToServer();
         setTimeout(() => modalEl.style.display = 'flex', 1000);
     }
 
-    // 11. Invia i risultati al server
+    // 11. Invia i risultati al server (funzione modificata)
     async function sendResultsToServer() {
-        // Invia solo se nome e email sono presenti
-        if (!studentInfo.name || !studentInfo.email) {
-            console.log("Dati studente non trovati, invio email saltato.");
+        const studentName = prompt("Complimenti! Inserisci il tuo nome per inviare i risultati all'insegnante:");
+        const studentEmail = prompt("Ora inserisci la tua email:");
+
+        if (!studentName || !studentEmail) {
+            alert("Risultati non inviati. I campi sono obbligatori.");
             return;
         }
 
-        const pathParts = window.location.pathname.split('/');
-        const projectName = pathParts[pathParts.length - 2];
         const totalPairsInGame = gameData.reduce((total, level) => total + level.pairs.length, 0);
+
         const payload = {
-            ...studentInfo,
+            name: studentName,
+            email: studentEmail,
             score: `${score} / ${totalPairsInGame}`,
             time: timerEl.textContent,
         };
 
         try {
-            await fetch(`/api/submit_result/${projectName}`, {
+            // L'ID del gioco viene preso dalla variabile globale `gameId`
+            const response = await fetch(`/api/submit_result/${gameId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
+
+            if (!response.ok) {
+                throw new Error('Errore durante l\'invio dei risultati.');
+            }
+
+            const result = await response.json();
+            if (result.status === 'success') {
+                alert("Risultati inviati con successo all'insegnante!");
+            } else {
+                alert(`Errore nell'invio dei risultati: ${result.message}`);
+            }
+
         } catch (error) {
             console.error("Errore nell'invio dei risultati:", error);
+            alert("Errore di rete. Impossibile inviare i risultati.");
         }
     }
 
@@ -296,5 +302,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // 13. Avvia il gioco
-    loadGameData();
+    // Usa la variabile globale `gameData` per inizializzare il gioco
+    if (typeof gameData !== 'undefined' && gameData.length > 0) {
+        initGame();
+    } else {
+        instructionTextEl.textContent = "Errore: dati del gioco non disponibili.";
+    }
 });

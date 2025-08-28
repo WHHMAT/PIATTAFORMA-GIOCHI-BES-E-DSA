@@ -4,8 +4,34 @@
     <meta charset="UTF-8">
     <title>Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <!-- Toastify CSS -->
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <style>
+        /* Stili aggiuntivi per il link online */
+        .online-links-container {
+            margin-top: 10px;
+            padding: 10px;
+            border-top: 1px solid #ccc;
+        }
+        .online-links-container h4 {
+            margin-top: 0;
+            margin-bottom: 5px;
+            font-size: 1em;
+            color: #555;
+        }
+        .shareable-link {
+            font-family: monospace;
+            background-color: #e8e8e8;
+            padding: 5px;
+            border-radius: 4px;
+            word-break: break-all;
+            cursor: pointer;
+            display: inline-block;
+            margin-top: 5px;
+        }
+        .shareable-link:hover {
+            background-color: #d1d1d1;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -14,7 +40,7 @@
         <div>
         <a href="{{ url_for('create_project') }}" class="button">Crea Nuovo Progetto</a>
         <a href="{{ url_for('reports') }}" class="button">Visualizza Report</a>
-        </div>    
+        </div>
         <h2>I Miei Progetti</h2>
         {% if projects %}
             <ul class="project-list">
@@ -24,7 +50,9 @@
                     <div class="project-actions">
                         <a href="{{ url_for('edit_project', project_name=project.id) }}" class="action-icon edit-icon" title="Modifica">✏️</a>
                         <a href="{{ url_for('preview_project_redirect', project_name=project.id) }}" class="action-icon preview-icon" title="Anteprima Rapida" target="_blank">▶️</a>
-                        <a href="{{ url_for('launch_game', project_name=project.id) }}" class="action-icon launch-icon" title="Avvia con Tracking" target="_blank">🚀</a>
+                        
+                        <button class="action-icon generate-link-btn" data-project-id="{{ project.id }}" title="Genera Link Online">🔗</button>
+                        
                         <a href="{{ url_for('export_project', project_name=project.id) }}" class="action-icon export-icon" title="Esporta">📥</a>
                         <button class="action-icon duplicate-icon" data-project-id="{{ project.id }}" data-project-name="{{ project.name }}" title="Duplica">📋</button>
                         <form class="delete-form" action="{{ url_for('delete_project', project_name=project.id) }}" method="post">
@@ -33,6 +61,21 @@
                             </button>
                         </form>
                     </div>
+
+                    <div class="online-links-container">
+                        <h4>Link Online:</h4>
+                        {% if project.online_games %}
+                            {% for online_game in project.online_games %}
+                                <span class="shareable-link" onclick="copyLink(this)">
+                                    {{ url_for('play_online_game', project_id=online_game.id, _external=True) }}
+                                </span>
+                            {% endfor %}
+                        {% else %}
+                            <p class="no-links-message">Nessun link generato.</p>
+                        {% endif %}
+                        <span class="shareable-link" id="new-link-{{ project.id }}" style="display: none;"></span>
+                    </div>
+
                 </li>
                 {% endfor %}
             </ul>
@@ -41,7 +84,6 @@
         {% endif %}
     </div>
 
-    <!-- Toastify JS -->
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
     <script>
         // Funzione helper per mostrare le notifiche toast
@@ -57,6 +99,17 @@
             }).showToast();
         }
 
+        // Funzione per copiare il link negli appunti
+        function copyLink(element) {
+            const linkText = element.textContent.trim();
+            navigator.clipboard.writeText(linkText).then(() => {
+                showToast('Link copiato negli appunti!', 'success');
+            }).catch(err => {
+                console.error('Impossibile copiare il link: ', err);
+                showToast('Errore nel copiare il link.', 'error');
+            });
+        }
+        
         // Gestione asincrona dell'eliminazione dei progetti
         document.querySelectorAll('.delete-form').forEach(form => {
             form.addEventListener('submit', async (e) => {
@@ -107,6 +160,65 @@
                         showToast('Errore di connessione con il server.', 'error');
                     }
                 }
+            });
+        });
+
+        // Gestione asincrona della generazione del link online
+        document.querySelectorAll('.generate-link-btn').forEach(button => {
+            button.addEventListener('click', async () => {
+                const projectId = button.dataset.projectId;
+                const newLinkSpan = document.getElementById(`new-link-${projectId}`);
+                
+                const teacherEmail = prompt("Per favore, inserisci la tua email per ricevere i risultati:");
+                
+                if (!teacherEmail) {
+                    showToast("Operazione annullata. L'email è necessaria per generare il link.", 'error');
+                    return;
+                }
+
+                button.disabled = true;
+                newLinkSpan.style.display = 'block';
+                newLinkSpan.textContent = 'Generazione in corso...';
+                
+                fetch(`/generate_online_link/${projectId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ teacher_email: teacherEmail })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        // Se la risposta non è OK, gestisce l'errore JSON
+                        return response.json().then(err => { throw new Error(err.message || 'Errore nella risposta del server.'); });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.status === 'success') {
+                        newLinkSpan.textContent = data.share_url;
+                        newLinkSpan.onclick = () => copyLink(newLinkSpan);
+                        showToast("Link generato con successo!", 'success');
+                        
+                        // Rimuovi il messaggio "Nessun link generato" se presente
+                        const noLinksMessage = newLinkSpan.closest('.online-links-container').querySelector('.no-links-message');
+                        if (noLinksMessage) {
+                            noLinksMessage.style.display = 'none';
+                        }
+
+                    } else {
+                        newLinkSpan.textContent = `Errore: ${data.message}`;
+                        showToast(data.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Errore:', error);
+                    newLinkSpan.textContent = `Errore di rete: ${error.message}`;
+                    showToast(`Errore: ${error.message}`, 'error');
+                })
+                .finally(() => {
+                    button.disabled = false;
+                });
             });
         });
     </script>

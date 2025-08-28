@@ -1,0 +1,5 @@
+{
+    "name": "MemoryProva1",
+    "description": "Un classico gioco di memory per abbinare coppie di carte. Utile per associare immagini, parole o concetti.",
+    "template_id": "memory_game"
+}

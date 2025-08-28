@@ -14,45 +14,30 @@ document.addEventListener('DOMContentLoaded', () => {
     const speakBtn = document.getElementById('speak-btn');
 
     // --- VARIABILI DI STATO ---
-    let gameData = {};
     let score = 0;
     let placedItems = 0;
     let timerInterval = null;
     let seconds = 0;
     let studentInfo = {};
 
-    // 0. Recupera i dati dello studente dall'URL
-    const urlParams = new URLSearchParams(window.location.search);
-    studentInfo = { name: urlParams.get('name'), email: urlParams.get('email') };
-
-    // 1. Carica i dati del gioco dal file JSON
-    async function loadGameData() {
-        try {
-            const response = await fetch('data.json');
-            if (!response.ok) throw new Error(`Errore HTTP: ${response.status}`);
-            gameData = await response.json();
-            initGame();
-        } catch (error) {
-            console.error("Errore nel caricamento di data.json:", error);
-            categoriesContainer.innerHTML = "<p>Errore: impossibile caricare i dati del gioco.</p>";
-        }
-    }
+    // 0. Qui caricheremo le variabili globali passate dal template
+    //    Le variabili `gameData` e `gameId` sono ora globali e disponibili
+    //    grazie al template Python (`game_template.html`).
+    //    Non è più necessario recuperare i dati dall'URL o da un file.
 
     // Funzione per la sintesi vocale (Text-to-Speech)
     function speakText(text) {
         if ('speechSynthesis' in window) {
-            // Ferma qualsiasi discorso precedente per evitare sovrapposizioni
             window.speechSynthesis.cancel();
-            
             const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'it-IT'; // Imposta la lingua italiana
+            utterance.lang = 'it-IT';
             window.speechSynthesis.speak(utterance);
         } else {
             alert("Il tuo browser non supporta la sintesi vocale.");
         }
     }
 
-    // 2. Inizializza o resetta il gioco
+    // 1. Inizializza o resetta il gioco
     function initGame() {
         score = 0;
         placedItems = 0;
@@ -60,8 +45,8 @@ document.addEventListener('DOMContentLoaded', () => {
         feedbackArea.textContent = '';
         modalEl.style.display = 'none';
 
+        // Usa direttamente gameData, non è più necessario caricarlo
         instructionTextEl.textContent = gameData.instruction || "Trascina ogni elemento nella sua categoria.";
-        // Pulisce e ricrea il tabellone
         itemsContainer.innerHTML = '<h2>Elementi da classificare</h2>';
         categoriesContainer.innerHTML = '';
 
@@ -70,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
         startTimer();
     }
 
-    // 3. Crea le categorie (drop zones)
+    // 2. Crea le categorie (drop zones)
     function createCategories() {
         gameData.categories.forEach(cat => {
             const categoryBox = document.createElement('div');
@@ -88,7 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 4. Crea gli elementi da trascinare
+    // 3. Crea gli elementi da trascinare
     function createItems() {
         const shuffledItems = [...gameData.items].sort(() => Math.random() - 0.5);
         shuffledItems.forEach(item => {
@@ -108,7 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 5. Avvia e gestisce il timer
+    // 4. Avvia e gestisce il timer
     function startTimer() {
         clearInterval(timerInterval);
         seconds = 0;
@@ -121,7 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1000);
     }
 
-    // 6. Gestisce il drop di un elemento
+    // 5. Gestisce il drop di un elemento
     function handleDrop(e) {
         e.preventDefault();
         this.classList.remove('drag-over');
@@ -144,65 +129,79 @@ document.addEventListener('DOMContentLoaded', () => {
             feedbackArea.style.color = 'red';
         }
 
-        // Controlla se il gioco è finito
         if (placedItems === gameData.items.length) {
             showGameEnd();
         }
     }
 
-    // 7. Mostra la schermata di fine gioco
+    // 6. Mostra la schermata di fine gioco
     function showGameEnd() {
         clearInterval(timerInterval);
         feedbackArea.textContent = 'Complimenti, hai classificato tutto!';
         feedbackArea.style.color = 'blue';
 
-        // Popola il modale
         finalScoreEl.textContent = score;
         totalItemsEl.textContent = gameData.items.length;
         finalTimeEl.textContent = timerEl.textContent;
 
+        // Richiama la nuova funzione per l'invio dei risultati
         sendResultsToServer();
 
-        // Mostra il modale con un piccolo ritardo
         setTimeout(() => {
             modalEl.style.display = 'flex';
         }, 1000);
     }
 
-    // 8. Invia i risultati al server
+    // 7. Invia i risultati al server
     async function sendResultsToServer() {
-        // Invia solo se nome e email sono presenti
-        if (!studentInfo.name || !studentInfo.email) {
-            console.log("Dati studente non trovati, invio email saltato.");
+        // Chiedi i dati allo studente
+        const studentName = prompt("Complimenti! Inserisci il tuo nome per inviare i risultati all'insegnante:");
+        const studentEmail = prompt("Ora inserisci la tua email:");
+
+        if (!studentName || !studentEmail) {
+            alert("Risultati non inviati. I campi sono obbligatori.");
             return;
         }
 
-        const pathParts = window.location.pathname.split('/');
-        const projectName = pathParts[pathParts.length - 2];
         const payload = {
-            ...studentInfo,
+            name: studentName,
+            email: studentEmail,
             score: `${score} / ${gameData.items.length}`,
             time: timerEl.textContent,
         };
 
         try {
-            await fetch(`/api/submit_result/${projectName}`, {
+            // L'ID del gioco viene preso dalla variabile globale `gameId`
+            const response = await fetch(`/api/submit_result/${gameId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
+
+            if (!response.ok) {
+                 throw new Error('Errore durante l\'invio dei risultati.');
+            }
+            
+            const result = await response.json();
+            if (result.status === 'success') {
+                alert("Risultati inviati con successo all'insegnante!");
+            } else {
+                alert(`Errore nell'invio dei risultati: ${result.message}`);
+            }
+
         } catch (error) {
             console.error("Errore nell'invio dei risultati:", error);
+            alert("Errore di rete. Impossibile inviare i risultati.");
         }
     }
 
-    // 9. Event listeners
+    // 8. Event listeners
     playAgainBtn.addEventListener('click', initGame);
     speakBtn.addEventListener('click', () => {
         const textToSpeak = instructionTextEl.textContent;
         if (textToSpeak) speakText(textToSpeak);
     });
 
-    // 10. Avvia il gioco
-    loadGameData();
+    // 9. Avvia il gioco
+    initGame();
 });

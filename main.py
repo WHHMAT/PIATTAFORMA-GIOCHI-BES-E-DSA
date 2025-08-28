@@ -1,12 +1,13 @@
 # main.py
 
-from flask import Flask, render_template, request, redirect, url_for, flash, send_file, send_from_directory, jsonify
+from flask import Flask, render_template, render_template_string, request, redirect, url_for, flash, send_file, send_from_directory, jsonify
 from flask_sqlalchemy import SQLAlchemy
 import re, json, os
 import os, shutil, io, zipfile
 from datetime import datetime
 import mailchimp_transactional
 from mailchimp_transactional.api_client import ApiClientError
+import uuid  # Importa il modulo uuid per generare ID univoci
 
 app = Flask(__name__)
 
@@ -51,9 +52,23 @@ class GameResult(db.Model):
     score = db.Column(db.String(50), nullable=False)
     time_spent = db.Column(db.String(50), nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    # Colonna per l'ID univoco del gioco online
+    online_game_id = db.Column(db.String(36), nullable=False, unique=True)
+    # Colonna per l'email dell'insegnante
+    teacher_email = db.Column(db.String(100), nullable=False)
 
     def __repr__(self):
         return f'<GameResult {self.student_name} - {self.project_name}>'
+    
+class OnlineGame(db.Model):
+    id = db.Column(db.String(36), primary_key=True, default=str(uuid.uuid4()))
+    project_name = db.Column(db.String(100), nullable=False)
+    teacher_email = db.Column(db.String(100), nullable=False)
+    date_created = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<OnlineGame {self.id} - {self.project_name}>'
+
 
 # --- Game Development Platform Core ---
 
@@ -74,6 +89,7 @@ def dashboard():
         for p_folder in project_folders:
             manifest_path = os.path.join(projects_dir, p_folder, 'manifest.json')
             display_name = p_folder # Nome di fallback
+            online_games = OnlineGame.query.filter_by(project_name=p_folder).all() # Recupera i link unici
             if os.path.isfile(manifest_path):
                 try:
                     with open(manifest_path, 'r', encoding='utf-8') as f:
@@ -82,7 +98,7 @@ def dashboard():
                 except (json.JSONDecodeError, IOError):
                     # Se il manifest è corrotto o illeggibile, usa il nome della cartella
                     pass
-            user_projects.append({'id': p_folder, 'name': display_name})
+            user_projects.append({'id': p_folder, 'name': display_name, 'online_games': online_games})
     except FileNotFoundError:
         pass # user_projects rimane una lista vuota
     return render_template('dashboard.html', projects=user_projects)
@@ -196,25 +212,108 @@ def create_project():
     print("Contenuto di 'available_templates':", available_templates)
     return render_template('create_project.html', templates=available_templates)
 
-@app.route('/launch/<string:project_name>')
-def launch_game(project_name):
-    """Mostra una pagina di avvio per inserire i dati dello studente."""
+# MODIFICA: La vecchia rotta 'launch' non è più necessaria nel nuovo approccio
+# @app.route('/launch/<string:project_name>')
+# def launch_game(project_name):
+#     """Mostra una pagina di avvio per inserire i dati dello studente."""
+#     project_path = os.path.join(app.config['UPLOAD_FOLDER'], project_name)
+#     if not os.path.isdir(project_path):
+#         flash(f'Progetto "{project_name}" non trovato.', 'error')
+#         return redirect(url_for('dashboard'))
+#     return render_template('launch_game.html', project_name=project_name)
+
+# NUOVA FUNZIONE: Genera e salva un link unico per un progetto
+@app.route('/generate_online_link/<string:project_name>', methods=['POST'])
+def generate_online_link(project_name):
+    # In una vera app, l'email dell'insegnante verrebbe presa dall'utente loggato.
+    # Per ora la prendiamo da un campo del form o da una variabile d'ambiente.
+    teacher_email = request.get_json().get('teacher_email')
+    
+    if not teacher_email:
+        return jsonify({'status': 'error', 'message': 'Email dell\'insegnante non fornita.'}), 400
+
+    # Controlla se il progetto esiste
     project_path = os.path.join(app.config['UPLOAD_FOLDER'], project_name)
     if not os.path.isdir(project_path):
-        flash(f'Progetto "{project_name}" non trovato.', 'error')
-        return redirect(url_for('dashboard'))
-    return render_template('launch_game.html', project_name=project_name)
+        return jsonify({'status': 'error', 'message': 'Progetto non trovato.'}), 404
 
-@app.route('/play/<string:project_name>')
-def play_game(project_name):
-    """Reindirizza al file index.html del gioco, mantenendo i parametri URL."""
-    target_url = url_for('serve_project_file', project_name=project_name, filename='index.html')
+    # Crea un nuovo record nel database per il link unico
+    try:
+        new_online_game = OnlineGame(project_name=project_name, teacher_email=teacher_email)
+        db.session.add(new_online_game)
+        db.session.commit()
+        # Costruisci l'URL completo per il link di condivisione
+        share_url = url_for('play_online_game', project_id=new_online_game.id, _external=True)
+        return jsonify({'status': 'success', 'share_url': share_url})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': f'Errore nel generare il link: {e}'}), 500
 
-    query_string = request.query_string.decode('utf-8')
-    if query_string:
-        # Reindirizza aggiungendo i parametri all'URL di destinazione
-        return redirect(f"{target_url}?{query_string}")
-    return redirect(target_url)
+# NUOVA FUNZIONE: Servire il gioco online usando un ID univoco, risolvendo i percorsi relativi
+@app.route('/play_online/<string:project_id>')
+def play_online_game(project_id):
+    """
+    Renderizza la pagina di un gioco online.
+    Usa lo stesso approccio della preview: renderizza l'index.html del progetto,
+    ma in più inietta un tag <base> per risolvere correttamente i percorsi
+    relativi a CSS, JS e immagini.
+    """
+    # 1. Trova il record del gioco online per ottenere il nome del progetto
+    online_game = OnlineGame.query.get(project_id)
+    if not online_game:
+        return "Link non valido o scaduto.", 404
+
+    # 2. Trova i file del progetto
+    project_name = online_game.project_name
+    project_dir = os.path.join(app.config['UPLOAD_FOLDER'], project_name)
+    template_file_path = os.path.join(project_dir, 'index.html')
+
+    if not os.path.isdir(project_dir) or not os.path.isfile(template_file_path):
+        return "Errore: File del progetto di gioco non trovati.", 404
+
+    # 3. Carica i dati del gioco (data.json)
+    data_path = os.path.join(project_dir, 'data.json')
+    game_data_dict = {}
+    if os.path.exists(data_path):
+        try:
+            with open(data_path, 'r', encoding='utf-8') as f:
+                game_data_dict = json.load(f)
+        except (IOError, json.JSONDecodeError) as e:
+            return f"Errore nel caricare i dati del gioco: {e}", 500
+    
+    # 4. Leggi il template e inietta il tag <base> per risolvere i percorsi relativi
+    try:
+        with open(template_file_path, 'r', encoding='utf-8') as f:
+            template_string = f.read()
+        
+        base_href = url_for('serve_online_game_asset', project_id=project_id, filename='')
+        base_tag = f'<base href="{base_href}">'
+        template_string = template_string.replace('<head>', f'<head>\n    {base_tag}', 1)
+
+        # 5. Renderizza il template modificato, iniettando i dati del gioco
+        return render_template_string(
+            template_string,
+            game_id=project_id,
+            game_data=json.dumps(game_data_dict)
+        )
+    except (IOError, json.JSONDecodeError) as e:
+        return f"Errore nel caricare i dati del gioco: {e}", 500
+    
+# Vecchie rotte non più necessarie o da adattare
+# @app.route('/play/<string:project_name>')
+# def play_game(project_name):
+# ...
+
+# NUOVA ROTTA: Serve i file statici (CSS, JS, immagini) per i giochi online
+@app.route('/play_online/<string:project_id>/assets/<path:filename>')
+def serve_online_game_asset(project_id, filename):
+    online_game = OnlineGame.query.get(project_id)
+    if not online_game:
+        return "Link non valido.", 404
+    
+    project_dir = os.path.join(app.config['UPLOAD_FOLDER'], online_game.project_name)
+    
+    return send_from_directory(project_dir, filename)
 
 @app.route('/preview/<string:project_name>')
 def preview_project_redirect(project_name):
@@ -224,14 +323,48 @@ def preview_project_redirect(project_name):
 
 @app.route('/preview/<string:project_name>/<path:filename>')
 def serve_project_file(project_name, filename):
-    """Serves a file from a specific project's directory for the live preview."""
+    """
+    Serves a file from a specific project's directory for the live preview.
+    If the file is 'index.html', it renders it as a template to inject game data.
+    """
     project_dir = os.path.join(app.config['UPLOAD_FOLDER'], project_name)
-    # Controllo di sicurezza di base
+    
+    # Basic security check
     if not os.path.isdir(project_dir):
         flash(f'Progetto "{project_name}" non trovato.', 'error')
         return redirect(url_for('dashboard'))
-    return send_from_directory(project_dir, filename)
 
+    # If the request is for index.html, render it with data
+    if filename == 'index.html':
+        data_path = os.path.join(project_dir, 'data.json')
+        game_data_dict = {}
+        if os.path.exists(data_path):
+            try:
+                with open(data_path, 'r', encoding='utf-8') as f:
+                    game_data_dict = json.load(f)
+            except (IOError, json.JSONDecodeError) as e:
+                print(f"Error loading data.json for preview of {project_name}: {e}")
+        
+        game_data_as_json_string = json.dumps(game_data_dict)
+        template_file_path = os.path.join(project_dir, filename)
+
+        if not os.path.exists(template_file_path):
+            return "File template (index.html) non trovato nel progetto.", 404
+
+        try:
+            with open(template_file_path, 'r', encoding='utf-8') as f:
+                template_string = f.read()
+            
+            # Usa render_template_string per renderizzare il contenuto del file
+            return render_template_string(
+                template_string,
+                game_id=project_name,
+                game_data=game_data_as_json_string
+            )
+        except IOError as e:
+            return f"Errore nella lettura del file template: {e}", 500
+
+    return send_from_directory(project_dir, filename)
 @app.route('/edit_project/<string:project_name>')
 def edit_project(project_name):
     """Rende la pagina dell'editor di codice per un progetto specifico."""
@@ -352,8 +485,9 @@ def save_visual_data(project_name):
     except IOError as e:
         return jsonify({'error': f'Errore di scrittura del file: {e}'}), 500
 
-@app.route('/api/submit_result/<string:project_name>', methods=['POST'])
-def submit_result(project_name):
+# MODIFICA: La rotta per l'invio dei risultati è stata aggiornata per supportare l'ID del gioco online
+@app.route('/api/submit_result/<string:project_id>', methods=['POST'])
+def submit_result(project_id):
     """API per ricevere i risultati del gioco e inviare un'email."""
     data = request.get_json()
     if not mailchimp_client:
@@ -363,15 +497,19 @@ def submit_result(project_name):
     if not data or not all(k in data for k in ['name', 'email', 'score', 'time']):
         return jsonify({'error': 'Dati mancanti'}), 400
 
+    # Recupera l'oggetto OnlineGame per ottenere l'email dell'insegnante e il nome del progetto
+    online_game = OnlineGame.query.get(project_id)
+    if not online_game:
+        return jsonify({'error': 'ID del progetto non valido.'}), 404
+        
+    project_name = online_game.project_name
+    teacher_email = online_game.teacher_email
+
     # --- Pulizia Dati Robusta ---
-    # Pulisce tutti i dati di testo da eventuali caratteri problematici come lo spazio indivisibile (\xa0)
-    # per prevenire errori di encoding.
     student_name = data.get('name', '').replace('\xa0', ' ').strip()
-    clean_project_name = project_name.replace('\xa0', ' ').strip()
     recipient_email = data.get('email').strip()
 
     # Usa l'email del mittente configurata tramite variabili d'ambiente.
-    # Questa DEVE essere un'email appartenente a un dominio che hai verificato su Mailchimp.
     if not SENDER_EMAIL_VERIFIED:
         print("ERRORE: L'email del mittente (MAILCHIMP_SENDER_EMAIL) non è configurata.")
         return jsonify({'error': 'Il servizio email non è configurato correttamente dal lato server.'}), 500
@@ -381,9 +519,11 @@ def submit_result(project_name):
         new_result = GameResult(
             student_name=student_name,
             student_email=recipient_email,
-            project_name=clean_project_name,
+            project_name=project_name,
             score=data.get('score', 'N/D'),
-            time_spent=data.get('time', 'N/D')
+            time_spent=data.get('time', 'N/D'),
+            online_game_id=project_id,
+            teacher_email=teacher_email
         )
         db.session.add(new_result)
         db.session.commit()
@@ -398,15 +538,16 @@ def submit_result(project_name):
 
     try:
         # 1. Renderizza il corpo HTML dell'email usando il template esistente
-        html_body = render_template('email_result.html', **data, project_name=clean_project_name)
+        # Passa l'email dell'insegnante per sicurezza, anche se non usata direttamente nel template dell'email
+        html_body = render_template('email_result.html', **data, project_name=project_name, teacher_email=teacher_email)
 
         # 2. Costruisci l'oggetto messaggio per l'API di Mailchimp
         message = {
             "html": html_body,
-            "subject": f"Risultati del gioco '{clean_project_name}' per {student_name}",
+            "subject": f"Risultati del gioco '{project_name}' per {student_name}",
             "from_email": SENDER_EMAIL_VERIFIED,
             "from_name": "Piattaforma Giochi BES/DSA",
-            "to": [{"email": recipient_email, "type": "to"}]
+            "to": [{"email": teacher_email, "type": "to"}] # L'email del destinatario è l'insegnante
         }
 
         # 3. Invia l'email tramite l'API
@@ -419,21 +560,21 @@ def submit_result(project_name):
         return jsonify({'error': 'Impossibile inviare l\'email. Errore API.'}), 500
     except Exception as e:
         # Gestisce altri errori, come problemi di rete (es. Timeout)
-        # La libreria mailchimp-transactional usa 'requests' internamente, che può lanciare
-        # eccezioni come requests.exceptions.ConnectTimeout.
         print(f"Errore di rete o generico durante l'invio dell'email: {e}")
         return jsonify({'error': 'Impossibile connettersi al servizio email. Controllare la connessione internet del server e le impostazioni del firewall.'}), 503
 
 @app.route('/delete_project/<string:project_name>', methods=['POST'])
 def delete_project(project_name):
     """Elimina la cartella di un progetto."""
-    # Per sicurezza, puliamo il nome del progetto anche se proviene dal nostro sistema
     safe_project_name = re.sub(r'[^\w\s-]', '', project_name).strip().replace(' ', '_')
     project_path = os.path.join(app.config['UPLOAD_FOLDER'], safe_project_name)
 
     if os.path.isdir(project_path):
         try:
-            shutil.rmtree(project_path) # Elimina la cartella e tutto il suo contenuto
+            shutil.rmtree(project_path)
+            # Elimina anche gli ID dei giochi online associati a questo progetto
+            OnlineGame.query.filter_by(project_name=safe_project_name).delete()
+            db.session.commit()
             return jsonify({'status': 'success', 'message': f'Progetto "{safe_project_name}" eliminato con successo.'})
         except OSError as e:
             return jsonify({'status': 'error', 'message': f'Errore durante l\'eliminazione del progetto: {e}'}), 500
@@ -449,7 +590,6 @@ def duplicate_project(project_name):
     if not os.path.isdir(original_path):
         return jsonify({'status': 'error', 'message': 'Progetto originale non trovato.'}), 404
 
-    # Leggi il nome visualizzato originale dal manifest per usarlo come base
     original_display_name = project_name
     original_manifest_path = os.path.join(original_path, 'manifest.json')
     if os.path.isfile(original_manifest_path):
@@ -459,7 +599,6 @@ def duplicate_project(project_name):
         except (IOError, json.JSONDecodeError):
             pass
 
-    # Trova un nome unico per la cartella del progetto duplicato
     copy_number = 1
     while True:
         new_safe_name = f"{safe_project_name}_copia_{copy_number}"
@@ -468,13 +607,11 @@ def duplicate_project(project_name):
             break
         copy_number += 1
 
-    # Copia la cartella del progetto
     try:
         shutil.copytree(original_path, new_project_path)
     except OSError as e:
         return jsonify({'status': 'error', 'message': f'Errore durante la copia del progetto: {e}'}), 500
 
-    # Aggiorna il manifest.json del nuovo progetto con il nuovo nome
     new_manifest_path = os.path.join(new_project_path, 'manifest.json')
     if os.path.isfile(new_manifest_path):
         try:
@@ -496,13 +633,11 @@ def export_project(project_name):
         flash(f'Progetto "{project_name}" non trovato.', 'error')
         return redirect(url_for('dashboard'))
 
-    # Crea un file zip in memoria per evitare di scrivere file temporanei su disco
     memory_file = io.BytesIO()
     with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
         for root, dirs, files in os.walk(project_path):
             for file in files:
                 file_path = os.path.join(root, file)
-                # Crea un percorso relativo per i file all'interno dell'archivio zip
                 archive_path = os.path.relpath(file_path, project_path)
                 zf.write(file_path, archive_path)
     memory_file.seek(0)
@@ -513,14 +648,10 @@ def export_project(project_name):
         as_attachment=True
     )
 
-#if __name__ == '__main__':
-    # Crea le tabelle del database se non esistono già.
-    # Questo va eseguito una sola volta all'avvio dell'applicazione.
-#    with app.app_context():
-#        db.create_all()
-#        print("Database inizializzato e tabelle create (se non esistenti).")
-
-    # Avvia il server di sviluppo di Flask
-#    app.run(debug=True)
+if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
+        print("Database inizializzato e tabelle create (se non esistenti).")
+    app.run(debug=True)
 
 application = app

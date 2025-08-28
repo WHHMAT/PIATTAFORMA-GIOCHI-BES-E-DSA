@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const finalTimeEl = document.getElementById('final-time');
     const playAgainBtn = document.getElementById('play-again-btn');
     const controls = document.getElementById('controls');
-    const speakBtn = document.getElementById('speak-btn'); // Nuovo pulsante
+    const speakBtn = document.getElementById('speak-btn');
 
     // --- VARIABILI DI STATO ---
     let gameData = [];
@@ -22,88 +22,74 @@ document.addEventListener('DOMContentLoaded', () => {
     let seconds = 0;
     let isGameOver = false;
     let studentInfo = {};
-    const CELL_SIZE = 40; // Deve corrispondere al CSS
+    const CELL_SIZE = 40;
 
-    // 0. Recupera i dati dello studente dall'URL
-    const urlParams = new URLSearchParams(window.location.search);
-    studentInfo = { name: urlParams.get('name'), email: urlParams.get('email') };
+    // 0. Le variabili `gameData` e `gameId` sono ora globali e disponibili
+    //    Non è più necessario recuperare i dati dall'URL.
+    //    Rimuoviamo questa parte: `const urlParams = new URLSearchParams(window.location.search);`
+    //    e `studentInfo = { name: urlParams.get('name'), email: urlParams.get('email') };`
+    //    Poiché i dati dello studente vengono richiesti alla fine del gioco.
 
-    // 1. Carica i dati del gioco dal file JSON
-    async function loadGameData() {
-        try {
-            const response = await fetch('data.json');
-            if (!response.ok) throw new Error(`Errore HTTP: ${response.status}`);
-            gameData = await response.json();
-            initGame();
-        } catch (error) {
-            console.error("Errore nel caricamento di data.json:", error);
-            instructionTextEl.textContent = "Errore: impossibile caricare i dati del gioco.";
+    // 1. Inizializzazione del gioco (ora usa direttamente la variabile globale `gameData`)
+    function initGame() {
+        moves = 0;
+        isGameOver = false;
+        movesCountEl.textContent = moves;
+        modalEl.style.display = 'none';
+        controls.style.visibility = 'visible';
+
+        // L'oggetto `gameData` è già disponibile globalmente.
+        if (currentLevelIndex < gameData.levels.length) { // MODIFICA: usa `gameData.levels`
+            loadLevel(currentLevelIndex);
+            startTimer();
+        } else {
+            // Se tutti i livelli sono stati completati
+            currentLevelIndex = 0;
+            loadLevel(currentLevelIndex);
+            startTimer();
+            playAgainBtn.textContent = 'Gioca Ancora';
+            document.querySelector('#end-game-modal h2').textContent = 'Hai completato tutti i labirinti!';
         }
     }
 
     // Funzione per la sintesi vocale (Text-to-Speech)
     function speakText(text) {
         if ('speechSynthesis' in window) {
-            // Ferma qualsiasi discorso precedente per evitare sovrapposizioni
             window.speechSynthesis.cancel();
-            
             const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'it-IT'; // Imposta la lingua italiana
+            utterance.lang = 'it-IT';
             window.speechSynthesis.speak(utterance);
         } else {
             alert("Il tuo browser non supporta la sintesi vocale.");
         }
     }
 
-   // 2. Inizializza o resetta il gioco
-function initGame() {
-    moves = 0;
-    isGameOver = false;
-    movesCountEl.textContent = moves;
-    modalEl.style.display = 'none';
-    controls.style.visibility = 'visible';
-
-    // Controlla se ci sono ancora livelli da giocare
-    if (currentLevelIndex < gameData.length) {
-        loadLevel(currentLevelIndex);
-        startTimer();
-    } else {
-        // Se tutti i livelli sono stati completati, resetta e ricomincia
-        currentLevelIndex = 0;
-        loadLevel(currentLevelIndex);
-        startTimer();
-        // Resetta i testi a quelli iniziali
-        playAgainBtn.textContent = 'Gioca Ancora';
-        document.querySelector('#end-game-modal h2').textContent = 'Ce l\'hai fatta!';
-    }
-}
-
-    // 3. Carica un livello specifico
+    // 2. Carica un livello specifico
     function loadLevel(levelIndex) {
-        if (!gameData[levelIndex]) {
+        if (!gameData.levels[levelIndex]) { // MODIFICA: usa `gameData.levels`
             instructionTextEl.textContent = "Hai completato tutti i livelli!";
             mazeContainerEl.innerHTML = '';
+            // Invia i risultati se tutti i livelli sono stati completati
+            sendResultsToServer('Tutti i livelli completati'); 
             return;
         }
 
         mazeContainerEl.innerHTML = '';
-        const level = gameData[levelIndex];
+        const level = gameData.levels[levelIndex]; // MODIFICA: usa `gameData.levels`
         currentLayout = level.layout;
         if (!level || !currentLayout || currentLayout.length === 0) {
             console.error(`Layout non trovato o vuoto per il livello ${levelIndex}`);
             instructionTextEl.textContent = "Errore: dati del livello corrotti.";
             return;
         }
-        instructionTextEl.textContent = gameData[levelIndex].instruction;
+        instructionTextEl.textContent = gameData.levels[levelIndex].instruction; // MODIFICA: usa `gameData.levels`
 
-        // Imposta le dimensioni della griglia del labirinto
         const rows = currentLayout.length;
         const cols = currentLayout[0].length;
         mazeContainerEl.style.gridTemplateColumns = `repeat(${cols}, ${CELL_SIZE}px)`;
         mazeContainerEl.style.width = `${cols * CELL_SIZE}px`;
         mazeContainerEl.style.height = `${rows * CELL_SIZE}px`;
 
-        // Crea le celle del labirinto
         currentLayout.forEach((row, y) => {
             row.forEach((cellType, x) => {
                 const cellEl = document.createElement('div');
@@ -119,7 +105,7 @@ function initGame() {
         createPlayer();
     }
 
-    // 4. Crea l'elemento del giocatore e lo posiziona
+    // 3. Crea l'elemento del giocatore e lo posiziona
     function createPlayer() {
         playerEl = document.createElement('div');
         playerEl.id = 'player';
@@ -127,13 +113,13 @@ function initGame() {
         updatePlayerPosition();
     }
 
-    // 5. Aggiorna la posizione CSS del giocatore
+    // 4. Aggiorna la posizione CSS del giocatore
     function updatePlayerPosition() {
         playerEl.style.top = `${player.y * CELL_SIZE}px`;
         playerEl.style.left = `${player.x * CELL_SIZE}px`;
     }
 
-    // 6. Avvia e gestisce il timer
+    // 5. Avvia e gestisce il timer
     function startTimer() {
         clearInterval(timerInterval);
         seconds = 0;
@@ -146,106 +132,110 @@ function initGame() {
         }, 1000);
     }
 
-    // 7. Gestisce il movimento del giocatore
+    // 6. Gestisce il movimento del giocatore
     function movePlayer(dx, dy) {
         if (isGameOver) return;
 
         const newX = player.x + dx;
         const newY = player.y + dy;
 
-        // Controllo dei confini del labirinto
         if (newY < 0 || newY >= currentLayout.length || newX < 0 || newX >= currentLayout[0].length) {
             return;
         }
 
-        // Controllo dei muri
         const targetCell = currentLayout[newY][newX];
         if (targetCell === 'wall') return;
 
-        // Il movimento è valido
         player.x = newX;
         player.y = newY;
         updatePlayerPosition();
         moves++;
         movesCountEl.textContent = moves;
 
-        // Controllo della condizione di vittoria
         if (targetCell === 'end') {
             showGameEnd();
         }
     }
 
- // 8. Mostra la schermata di fine gioco
-function showGameEnd() {
-    isGameOver = true;
-    clearInterval(timerInterval);
-    controls.style.visibility = 'hidden';
+    // 7. Mostra la schermata di fine gioco
+    function showGameEnd() {
+        isGameOver = true;
+        clearInterval(timerInterval);
+        controls.style.visibility = 'hidden';
 
-    // Incrementa l'indice del livello per preparare il prossimo
-    currentLevelIndex++;
+        currentLevelIndex++;
+        finalMovesEl.textContent = moves;
+        finalTimeEl.textContent = timerEl.textContent;
 
-    finalMovesEl.textContent = moves;
-    finalTimeEl.textContent = timerEl.textContent;
+        if (currentLevelIndex < gameData.levels.length) {
+            playAgainBtn.textContent = 'Prossimo Livello';
+            document.querySelector('#end-game-modal h2').textContent = `Livello ${currentLevelIndex} completato!`;
+            // Non inviamo i risultati a ogni livello, solo alla fine di tutti i livelli
+        } else {
+            playAgainBtn.textContent = 'Ricomincia da capo';
+            document.querySelector('#end-game-modal h2').textContent = 'Hai completato tutti i labirinti!';
+            sendResultsToServer('Tutti i livelli completati');
+        }
 
-    sendResultsToServer(); // Invia i risultati
-
-    // Controlla se ci sono altri livelli da giocare
-    if (currentLevelIndex < gameData.length) {
-        // Se ci sono altri livelli, cambia il testo del pulsante
-        playAgainBtn.textContent = 'Prossimo Livello';
-        // Aggiorna anche il titolo del modale per renderlo più dinamico
-        document.querySelector('#end-game-modal h2').textContent = `Livello ${currentLevelIndex} completato!`;
-    } else {
-        // Se tutti i livelli sono stati completati, mostra il testo finale
-        playAgainBtn.textContent = 'Ricomincia da capo';
-        document.querySelector('#end-game-modal h2').textContent = 'Hai completato tutti i labirinti!';
+        setTimeout(() => {
+            modalEl.style.display = 'flex';
+        }, 500);
     }
 
-    setTimeout(() => {
-        modalEl.style.display = 'flex';
-    }, 500);
-}
+    // 8. Invia i risultati al server (MODIFICATA)
+    async function sendResultsToServer(status) {
+        // Chiedi i dati allo studente solo alla fine
+        const studentName = prompt("Complimenti! Inserisci il tuo nome per inviare i risultati all'insegnante:");
+        const studentEmail = prompt("Ora inserisci la tua email:");
 
-    // 9. Invia i risultati al server
-    async function sendResultsToServer() {
-        // Invia solo se nome e email sono presenti
-        if (!studentInfo.name || !studentInfo.email) {
-            console.log("Dati studente non trovati, invio email saltato.");
+        if (!studentName || !studentEmail) {
+            alert("Risultati non inviati. I campi sono obbligatori.");
             return;
         }
 
-        const pathParts = window.location.pathname.split('/');
-        const projectName = pathParts[pathParts.length - 2];
         const payload = {
-            ...studentInfo,
-            score: `Mosse: ${moves}`, // Per il labirinto, il "punteggio" sono le mosse
-            time: timerEl.textContent,
+            name: studentName,
+            email: studentEmail,
+            score: `Livelli completati: ${gameData.levels.length}. Mosse totali: ${moves}`,
+            time: finalTimeEl.textContent,
         };
 
         try {
-            await fetch(`/api/submit_result/${projectName}`, {
+            // L'ID del gioco viene preso dalla variabile globale `gameId`
+            const response = await fetch(`/api/submit_result/${gameId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
+
+            if (!response.ok) {
+                 throw new Error('Errore durante l\'invio dei risultati.');
+            }
+            
+            const result = await response.json();
+            if (result.status === 'success') {
+                alert("Risultati inviati con successo all'insegnante!");
+            } else {
+                alert(`Errore nell'invio dei risultati: ${result.message}`);
+            }
+
         } catch (error) {
             console.error("Errore nell'invio dei risultati:", error);
+            alert("Errore di rete. Impossibile inviare i risultati.");
         }
     }
 
-    // 10. Event listeners per i controlli
+    // 9. Event listeners per i controlli
     document.getElementById('up-btn').addEventListener('click', () => movePlayer(0, -1));
     document.getElementById('down-btn').addEventListener('click', () => movePlayer(0, 1));
     document.getElementById('left-btn').addEventListener('click', () => movePlayer(-1, 0));
     document.getElementById('right-btn').addEventListener('click', () => movePlayer(1, 0));
     playAgainBtn.addEventListener('click', initGame);
-    // Aggiunge l'evento al nuovo pulsante per leggere le istruzioni
     speakBtn.addEventListener('click', () => {
         const textToSpeak = instructionTextEl.textContent;
         if (textToSpeak) speakText(textToSpeak);
     });
 
-    // Aggiunge il supporto per la tastiera
     document.addEventListener('keydown', (e) => {
         switch (e.key) {
             case 'ArrowUp': e.preventDefault(); movePlayer(0, -1); break;
@@ -255,6 +245,10 @@ function showGameEnd() {
         }
     });
 
-    // 11. Avvia il gioco
-    loadGameData();
+    // Avvia il gioco usando la variabile globale `gameData`
+    if (typeof gameData !== 'undefined' && gameData.levels) {
+        initGame();
+    } else {
+        instructionTextEl.textContent = "Errore: dati del gioco non disponibili.";
+    }
 });
