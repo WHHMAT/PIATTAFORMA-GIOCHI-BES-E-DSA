@@ -7,11 +7,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const scoreCountEl = document.getElementById('score-count');
     const timerEl = document.getElementById('timer');
     const modalEl = document.getElementById('end-game-modal');
+    // Elementi del modale di fine gioco
     const finalScoreEl = document.getElementById('final-score');
     const totalQuestionsEl = document.getElementById('total-questions');
     const finalTimeEl = document.getElementById('final-time');
     const playAgainBtn = document.getElementById('play-again-btn');
     const speakBtn = document.getElementById('speak-btn'); // Pulsante per la sintesi vocale
+    // Elementi del form nel modale
+    const resultForm = document.getElementById('result-form');
+    const studentNameInput = document.getElementById('student-name');
+    const studentEmailInput = document.getElementById('student-email');
+    const formFeedback = document.getElementById('form-feedback');
 
     // --- VARIABILI DI STATO ---
     let currentQuestionIndex = 0;
@@ -51,13 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
         optionsContainerEl.style.display = 'grid';
         
         startTimer();
-        
-        // Controlla se `gameData` esiste prima di caricarlo
-        if (typeof gameData !== 'undefined' && gameData.length > 0) {
-            loadQuestion(currentQuestionIndex);
-        } else {
-            questionTitleEl.textContent = "Errore: impossibile caricare i dati del gioco.";
-        }
+        loadQuestion(currentQuestionIndex);
     }
 
     // 2. Carica una domanda specifica
@@ -69,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
         feedbackTextEl.className = '';
         nextBtn.classList.add('hidden');
 
-        const currentQuestion = gameData[questionIndex];
+        const currentQuestion = gameData.questions[questionIndex];
         questionTitleEl.textContent = currentQuestion.question;
 
         // Mescola le opzioni per renderle casuali ogni volta
@@ -121,7 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Mostra il pulsante per andare avanti
-        if (currentQuestionIndex < gameData.length - 1) {
+        if (currentQuestionIndex < gameData.questions.length - 1) {
             nextBtn.classList.remove('hidden');
         } else {
             setTimeout(showGameEnd, 1500); // Mostra la fine dopo un breve ritardo
@@ -133,34 +133,45 @@ document.addEventListener('DOMContentLoaded', () => {
         clearInterval(timerInterval);
 
         finalScoreEl.textContent = score;
-        totalQuestionsEl.textContent = gameData.length;
+        totalQuestionsEl.textContent = gameData.questions.length;
         finalTimeEl.textContent = timerEl.textContent;
-
-        sendResultsToServer(); // Invia i risultati al server
-
+        
+        // Resetta lo stato del form per una nuova partita
+        if (resultForm) {
+            resultForm.style.display = 'block';
+            resultForm.reset();
+            resultForm.querySelector('button').disabled = false;
+        }
+        if (formFeedback) formFeedback.style.display = 'none';
+        
         questionTitleEl.style.display = 'none';
         optionsContainerEl.style.display = 'none';
         feedbackTextEl.textContent = '';
         nextBtn.classList.add('hidden');
         modalEl.style.display = 'flex';
     }
-
+    
     // 6. Invia i risultati al server (funzione modificata)
     async function sendResultsToServer() {
-        const studentName = prompt("Complimenti! Inserisci il tuo nome per inviare i risultati all'insegnante:");
-        const studentEmail = prompt("Ora inserisci la tua email:");
-
+        const studentName = studentNameInput.value.trim();
+        const studentEmail = studentEmailInput.value.trim();
+        
         if (!studentName || !studentEmail) {
-            alert("Risultati non inviati. I campi sono obbligatori.");
+            alert("Nome e email sono obbligatori.");
             return;
         }
 
         const payload = {
             name: studentName,
             email: studentEmail,
-            score: `${score} / ${gameData.length}`,
+            score: `${score} / ${gameData.questions.length}`,
             time: timerEl.textContent,
         };
+
+        const submitBtn = resultForm.querySelector('button');
+        submitBtn.disabled = true;
+        formFeedback.style.display = 'block';
+        formFeedback.textContent = 'Invio in corso...';
 
         try {
             // L'ID del gioco viene preso dalla variabile globale `gameId`
@@ -169,21 +180,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-
-            if (!response.ok) {
-                 throw new Error('Errore durante l\'invio dei risultati.');
-            }
             
             const result = await response.json();
+            if (!response.ok) throw new Error(result.message || 'Errore di rete.');
+
             if (result.status === 'success') {
-                alert("Risultati inviati con successo all'insegnante!");
+                formFeedback.textContent = "Risultati inviati con successo!";
+                resultForm.style.display = 'none'; // Nasconde il form dopo l'invio
             } else {
-                alert(`Errore nell'invio dei risultati: ${result.message}`);
+                throw new Error(result.message || 'Errore sconosciuto.');
             }
 
         } catch (error) {
             console.error("Errore nell'invio dei risultati:", error);
-            alert("Errore di rete. Impossibile inviare i risultati.");
+            formFeedback.textContent = `Errore: ${error.message}. Riprova.`;
+            submitBtn.disabled = false; // Riabilita il pulsante in caso di errore
         }
     }
 
@@ -192,13 +203,34 @@ document.addEventListener('DOMContentLoaded', () => {
         currentQuestionIndex++;
         loadQuestion(currentQuestionIndex);
     });
-    playAgainBtn.addEventListener('click', initGame);
+    playAgainBtn.addEventListener('click', () => {
+        modalEl.style.display = 'none';
+        initGame();
+    });
     // Aggiunge l'evento al pulsante per leggere la domanda
     speakBtn.addEventListener('click', () => {
         const textToSpeak = questionTitleEl.textContent;
         if (textToSpeak) speakText(textToSpeak);
     });
 
+    // Aggiungi listener per il submit del form
+    if (resultForm) {
+        resultForm.addEventListener('submit', (e) => {
+            e.preventDefault(); // Impedisce il ricaricamento della pagina
+            sendResultsToServer();
+        });
+    }
+
     // 8. Inizia il gioco
-    initGame();
+    if (typeof gameData !== 'undefined' && gameData.questions && Array.isArray(gameData.questions) && gameData.questions.length > 0 && typeof gameId !== 'undefined') {
+        initGame();
+    } else {
+        questionTitleEl.textContent = "Errore: impossibile caricare i dati del gioco.";
+        console.error("Errore: 'gameData' o 'gameId' non sono definiti correttamente.");
+        // Diagnostica aggiuntiva
+        if (typeof gameData === 'undefined') console.error("DEBUG: 'gameData' non è definita.");
+        else if (!gameData.questions) console.error("DEBUG: 'gameData' è definita, ma non ha la proprietà 'questions'.", gameData);
+        else if (!Array.isArray(gameData.questions)) console.error("DEBUG: 'gameData.questions' non è un array.", gameData.questions);
+        else if (gameData.questions.length === 0) console.error("DEBUG: 'gameData.questions' è un array vuoto.");
+    }
 });

@@ -6,30 +6,65 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
     <style>
-        /* Stili aggiuntivi per il link online */
+        /* --- Layout Migliorato per la Lista Progetti --- */
+        .project-list {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        .project-item {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem; /* Spazio tra header e area link */
+            background-color: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+
+        .project-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .project-name {
+            font-size: 1.6em;
+            font-weight: 600;
+            color: #333;
+            margin: 0;
+            flex-grow: 1; /* Permette al nome di occupare lo spazio disponibile */
+            word-break: break-word; /* Manda a capo i nomi lunghi */
+        }
+
+        .project-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            flex-shrink: 0; /* Impedisce alle icone di andare a capo */
+        }
+
+        .action-icon {
+            font-size: 1.6rem;
+            text-decoration: none;
+            color: #666;
+            transition: transform 0.2s ease-in-out;
+        }
+        .action-icon:hover {
+            transform: scale(1.2);
+        }
+
+        .delete-form { display: inline-flex; margin: 0; }
+        .delete-form button { background: none; border: none; padding: 0; cursor: pointer; }
+
+        /* --- Stili per l'area dei link online --- */
         .online-links-container {
-            margin-top: 10px;
-            padding: 10px;
-            border-top: 1px solid #ccc;
-        }
-        .online-links-container h4 {
-            margin-top: 0;
-            margin-bottom: 5px;
-            font-size: 1em;
-            color: #555;
-        }
-        .shareable-link {
-            font-family: monospace;
-            background-color: #e8e8e8;
-            padding: 5px;
-            border-radius: 4px;
-            word-break: break-all;
-            cursor: pointer;
-            display: inline-block;
-            margin-top: 5px;
-        }
-        .shareable-link:hover {
-            background-color: #d1d1d1;
+            background-color: #f7f9fc;
+            padding: 1rem;
+            border-radius: 8px;
         }
     </style>
 </head>
@@ -46,29 +81,31 @@
             <ul class="project-list">
             {% for project in projects %}
                 <li class="project-item" id="project-{{ project.id }}">
-                    <span class="project-name">{{ project.name }}</span>
-                    <div class="project-actions">
-                        <a href="{{ url_for('edit_project', project_name=project.id) }}" class="action-icon edit-icon" title="Modifica">✏️</a>
-                        <a href="{{ url_for('preview_project_redirect', project_name=project.id) }}" class="action-icon preview-icon" title="Anteprima Rapida" target="_blank">▶️</a>
-                        
-                        <button class="action-icon generate-link-btn" data-project-id="{{ project.id }}" title="Genera Link Online">🔗</button>
-                        
-                        <a href="{{ url_for('export_project', project_name=project.id) }}" class="action-icon export-icon" title="Esporta">📥</a>
-                        <button class="action-icon duplicate-icon" data-project-id="{{ project.id }}" data-project-name="{{ project.name }}" title="Duplica">📋</button>
-                        <form class="delete-form" action="{{ url_for('delete_project', project_name=project.id) }}" method="post">
-                            <button type="submit" class="action-icon delete-icon" title="Elimina">
-                                🗑️
-                            </button>
-                        </form>
+                    <div class="project-header">
+                        <h3 class="project-name">{{ project.name }}</h3>
+                        <div class="project-actions">
+                            <a href="{{ url_for('edit_project', project_name=project.id) }}" class="action-icon edit-icon" title="Modifica">✏️</a>
+                            <a href="{{ url_for('preview_project_redirect', project_name=project.id) }}" class="action-icon preview-icon" title="Anteprima Rapida" target="_blank">▶️</a>
+                            
+                            <button class="action-icon generate-link-btn" data-project-id="{{ project.id }}" title="Genera Link Online">🔗</button>
+                            
+                            <a href="{{ url_for('export_project', project_name=project.id) }}" class="action-icon export-icon" title="Esporta">📥</a>
+                            <button class="action-icon duplicate-icon" data-project-id="{{ project.id }}" data-project-name="{{ project.name }}" title="Duplica">📋</button>
+                            <form class="delete-form" action="{{ url_for('delete_project', project_name=project.id) }}" method="post">
+                                <button type="submit" class="action-icon delete-icon" title="Elimina">
+                                    🗑️
+                                </button>
+                            </form>
+                        </div>
                     </div>
 
                     <div class="online-links-container">
                         <h4>Link Online:</h4>
                         {% if project.online_games %}
                             {% for online_game in project.online_games %}
-                                <span class="shareable-link" onclick="copyLink(this)">
+                                <p class="shareable-link" onclick="copyLink(this)">
                                     {{ url_for('play_online_game', project_id=online_game.id, _external=True) }}
-                                </span>
+                                </p>
                             {% endfor %}
                         {% else %}
                             <p class="no-links-message">Nessun link generato.</p>

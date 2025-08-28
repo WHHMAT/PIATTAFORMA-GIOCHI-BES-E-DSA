@@ -61,7 +61,7 @@ class GameResult(db.Model):
         return f'<GameResult {self.student_name} - {self.project_name}>'
     
 class OnlineGame(db.Model):
-    id = db.Column(db.String(36), primary_key=True, default=str(uuid.uuid4()))
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     project_name = db.Column(db.String(100), nullable=False)
     teacher_email = db.Column(db.String(100), nullable=False)
     date_created = db.Column(db.DateTime, default=datetime.utcnow)

@@ -1,24 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // --- DATI DEL GIOCO ---
-    // Modifica questo array per cambiare le domande e le risposte del quiz.
-    const gameData = [
-        {
-            question: "Qual è la capitale d'Italia?",
-            options: ["Parigi", "Roma", "Berlino", "Madrid"],
-            answer: "Roma"
-        },
-        {
-            question: "Quanto fa 2 + 2?",
-            options: ["3", "4", "5", "6"],
-            answer: "4"
-        },
-        {
-            question: "Quale pianeta è conosciuto come il 'Pianeta Rosso'?",
-            options: ["Venere", "Marte", "Giove", "Saturno"],
-            answer: "Marte"
-        }
-    ];
-
     // --- ELEMENTI DEL DOM ---
     const questionTitleEl = document.getElementById('question-title');
     const optionsContainerEl = document.getElementById('options-container');
@@ -27,22 +7,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const scoreCountEl = document.getElementById('score-count');
     const timerEl = document.getElementById('timer');
     const modalEl = document.getElementById('end-game-modal');
+    // Elementi del modale di fine gioco
     const finalScoreEl = document.getElementById('final-score');
     const totalQuestionsEl = document.getElementById('total-questions');
     const finalTimeEl = document.getElementById('final-time');
     const playAgainBtn = document.getElementById('play-again-btn');
     const speakBtn = document.getElementById('speak-btn'); // Pulsante per la sintesi vocale
+    // Elementi del form nel modale
+    const resultForm = document.getElementById('result-form');
+    const studentNameInput = document.getElementById('student-name');
+    const studentEmailInput = document.getElementById('student-email');
+    const formFeedback = document.getElementById('form-feedback');
 
     // --- VARIABILI DI STATO ---
     let currentQuestionIndex = 0;
     let score = 0;
     let timerInterval = null;
     let seconds = 0;
-    let studentInfo = {};
 
-    // 0. Recupera i dati dello studente dall'URL
-    const urlParams = new URLSearchParams(window.location.search);
-    studentInfo = { name: urlParams.get('name'), email: urlParams.get('email') };
+    // 0. Le variabili `gameData` e `gameId` sono ora globali e disponibili.
+    //    Rimuovi il recupero dei dati dello studente dall'URL.
+    //    La richiesta delle informazioni avverrà alla fine del gioco.
+    //    const urlParams = new URLSearchParams(window.location.search);
+    //    studentInfo = { name: urlParams.get('name'), email: urlParams.get('email') };
 
     // Funzione per la sintesi vocale (Text-to-Speech)
     function speakText(text) {
@@ -82,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
         feedbackTextEl.className = '';
         nextBtn.classList.add('hidden');
 
-        const currentQuestion = gameData[questionIndex];
+        const currentQuestion = gameData.questions[questionIndex];
         questionTitleEl.textContent = currentQuestion.question;
 
         // Mescola le opzioni per renderle casuali ogni volta
@@ -134,7 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Mostra il pulsante per andare avanti
-        if (currentQuestionIndex < gameData.length - 1) {
+        if (currentQuestionIndex < gameData.questions.length - 1) {
             nextBtn.classList.remove('hidden');
         } else {
             setTimeout(showGameEnd, 1500); // Mostra la fine dopo un breve ritardo
@@ -146,41 +133,68 @@ document.addEventListener('DOMContentLoaded', () => {
         clearInterval(timerInterval);
 
         finalScoreEl.textContent = score;
-        totalQuestionsEl.textContent = gameData.length;
+        totalQuestionsEl.textContent = gameData.questions.length;
         finalTimeEl.textContent = timerEl.textContent;
-
-        sendResultsToServer(); // Invia i risultati al server
-
+        
+        // Resetta lo stato del form per una nuova partita
+        if (resultForm) {
+            resultForm.style.display = 'block';
+            resultForm.reset();
+            resultForm.querySelector('button').disabled = false;
+        }
+        if (formFeedback) formFeedback.style.display = 'none';
+        
         questionTitleEl.style.display = 'none';
         optionsContainerEl.style.display = 'none';
         feedbackTextEl.textContent = '';
         nextBtn.classList.add('hidden');
         modalEl.style.display = 'flex';
     }
-
-    // 6. Invia i risultati al server
+    
+    // 6. Invia i risultati al server (funzione modificata)
     async function sendResultsToServer() {
-        // Invia solo se nome e email sono presenti
-        if (!studentInfo.name || !studentInfo.email) {
-            console.log("Dati studente non trovati, invio email saltato.");
+        const studentName = studentNameInput.value.trim();
+        const studentEmail = studentEmailInput.value.trim();
+        
+        if (!studentName || !studentEmail) {
+            alert("Nome e email sono obbligatori.");
             return;
         }
 
-        const projectName = window.location.pathname.split('/')[2];
         const payload = {
-            ...studentInfo,
-            score: `${score} / ${gameData.length}`,
+            name: studentName,
+            email: studentEmail,
+            score: `${score} / ${gameData.questions.length}`,
             time: timerEl.textContent,
         };
 
+        const submitBtn = resultForm.querySelector('button');
+        submitBtn.disabled = true;
+        formFeedback.style.display = 'block';
+        formFeedback.textContent = 'Invio in corso...';
+
         try {
-            await fetch(`/api/submit_result/${projectName}`, {
+            // L'ID del gioco viene preso dalla variabile globale `gameId`
+            const response = await fetch(`/api/submit_result/${gameId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
+            
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message || 'Errore di rete.');
+
+            if (result.status === 'success') {
+                formFeedback.textContent = "Risultati inviati con successo!";
+                resultForm.style.display = 'none'; // Nasconde il form dopo l'invio
+            } else {
+                throw new Error(result.message || 'Errore sconosciuto.');
+            }
+
         } catch (error) {
             console.error("Errore nell'invio dei risultati:", error);
+            formFeedback.textContent = `Errore: ${error.message}. Riprova.`;
+            submitBtn.disabled = false; // Riabilita il pulsante in caso di errore
         }
     }
 
@@ -189,13 +203,34 @@ document.addEventListener('DOMContentLoaded', () => {
         currentQuestionIndex++;
         loadQuestion(currentQuestionIndex);
     });
-    playAgainBtn.addEventListener('click', initGame);
+    playAgainBtn.addEventListener('click', () => {
+        modalEl.style.display = 'none';
+        initGame();
+    });
     // Aggiunge l'evento al pulsante per leggere la domanda
     speakBtn.addEventListener('click', () => {
         const textToSpeak = questionTitleEl.textContent;
         if (textToSpeak) speakText(textToSpeak);
     });
 
+    // Aggiungi listener per il submit del form
+    if (resultForm) {
+        resultForm.addEventListener('submit', (e) => {
+            e.preventDefault(); // Impedisce il ricaricamento della pagina
+            sendResultsToServer();
+        });
+    }
+
     // 8. Inizia il gioco
-    initGame();
+    if (typeof gameData !== 'undefined' && gameData.questions && Array.isArray(gameData.questions) && gameData.questions.length > 0 && typeof gameId !== 'undefined') {
+        initGame();
+    } else {
+        questionTitleEl.textContent = "Errore: impossibile caricare i dati del gioco.";
+        console.error("Errore: 'gameData' o 'gameId' non sono definiti correttamente.");
+        // Diagnostica aggiuntiva
+        if (typeof gameData === 'undefined') console.error("DEBUG: 'gameData' non è definita.");
+        else if (!gameData.questions) console.error("DEBUG: 'gameData' è definita, ma non ha la proprietà 'questions'.", gameData);
+        else if (!Array.isArray(gameData.questions)) console.error("DEBUG: 'gameData.questions' non è un array.", gameData.questions);
+        else if (gameData.questions.length === 0) console.error("DEBUG: 'gameData.questions' è un array vuoto.");
+    }
 });

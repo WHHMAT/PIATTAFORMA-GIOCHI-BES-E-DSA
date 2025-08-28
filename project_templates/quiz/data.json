@@ -1,0 +1,14 @@
+{
+    "questions": [
+        {
+            "question": "Qual è la capitale d'Italia?",
+            "options": [
+                "Milano",
+                "Roma",
+                "Napoli",
+                "Torino"
+            ],
+            "answer": "Roma"
+        }
+    ]
+}

@@ -1,5 +1,5 @@
 {
-    "name": "InteractiveStoryTTS1",
+    "name": "InteractiveStory1",
     "description": "Crea una storia a bivi in cui le scelte del giocatore determinano il finale.",
     "version": "1.0.0",
     "template_id": "interactive_story"

@@ -28,9 +28,20 @@
             <h2>Quiz Completato!</h2>
             <p>Punteggio finale: <span id="final-score">0</span> su <span id="total-questions">0</span></p>
             <p>Tempo impiegato: <span id="final-time">00:00</span></p>
-            <button id="play-again-btn">Gioca Ancora</button>
+            <form id="result-form" class="result-form">
+                <p>Inserisci i tuoi dati per inviare i risultati.</p>
+                <input type="text" id="student-name" placeholder="Il tuo nome" required>
+                <input type="email" id="student-email" placeholder="La tua email" required>
+                <button type="submit">Invia Risultati</button>
+            </form>
+            <div id="form-feedback" style="display: none; margin-top: 1rem;"></div>
+            <button id="play-again-btn" style="margin-top: 1rem;">Gioca Ancora</button>
         </div>
     </div>
-    <script src="script.js"></script>
+    <script>
+      const gameId = {{ game_id|tojson|default('null') }};
+      const gameData = {{ game_data|safe|default('null') }};
+    </script>
+    <script src="script.js" defer></script>
 </body>
 </html>
