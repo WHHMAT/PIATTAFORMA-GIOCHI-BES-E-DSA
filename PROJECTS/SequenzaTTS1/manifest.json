@@ -1,5 +1,0 @@
-{
-    "name": "SequenzaTTS1",
-    "description": "Un'attività per completare una sequenza logica scegliendo l'elemento mancante. Allena il riconoscimento di pattern e il ragionamento sequenziale.",
-    "template_id": "sequence_completion"
-}
